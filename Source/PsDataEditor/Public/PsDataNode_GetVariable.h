@@ -19,6 +19,7 @@ public:
 	// End UEdGraphNode interface.
 
 	// Begin UK2Node interface
+	virtual void SetFromFunction(const UFunction* Function) override;
 	virtual bool IsNodePure() const override { return true; }
 	virtual FText GetMenuCategory() const override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;

@@ -3,6 +3,7 @@
 #include "PsNetworkData.h"
 
 #include "PsDataAPI.h"
+#include "Serialize/PsDataOptimizedBinarySerialization.h"
 
 #include "Engine/Engine.h"
 #include "Engine/NetDriver.h"
@@ -12,6 +13,67 @@
 #include <string>
 
 using namespace PsDataTools;
+
+namespace PsDataTools
+{
+
+void StringToBuffer(const FString& String, FPsNetworkByteBuffer& OutBuffer)
+{
+	OutBuffer.Buffer.Reset();
+	const auto Converter = FTCHARToUTF8(*String, String.Len());
+	OutBuffer.Buffer.Append(reinterpret_cast<const uint8*>(Converter.Get()), Converter.Length());
+}
+
+void BufferToString(const FPsNetworkByteBuffer& Buffer, FString& OutString)
+{
+	OutString.Reset();
+	const auto Converter = FUTF8ToTCHAR(reinterpret_cast<const char*>(Buffer.Buffer.GetData()), Buffer.Buffer.Num());
+	OutString.AppendChars(Converter.Get(), Converter.Length());
+}
+
+FString DecodePath(const TArray<uint16>& EncodedPath, const TArray<FString>& Dictionary)
+{
+	FString Result;
+
+	for (int32 i = 0; i < EncodedPath.Num(); ++i)
+	{
+		const auto Index = EncodedPath[i];
+		check(Dictionary.IsValidIndex(Index));
+
+		if (i != 0)
+		{
+			Result.AppendChar('.');
+		}
+		Result.Append(Dictionary[Index]);
+	}
+
+	return Result;
+}
+
+TArray<uint16> EncodePath(const FString& DecodedPath, TArray<FString>& Dictionary)
+{
+	TArray<uint16> Result;
+
+	TArray<FString> Strings;
+	DecodedPath.ParseIntoArray(Strings, TEXT("."));
+
+	for (int32 i = 0; i < Strings.Num(); ++i)
+	{
+		const auto String = Strings[i];
+		auto Index = Dictionary.Find(String);
+		if (Index == INDEX_NONE)
+		{
+			Index = Dictionary.Add(String);
+		}
+
+		check(TNumericLimits<uint16>::Max() >= Index);
+		Result.Add(Index);
+	}
+
+	return Result;
+}
+
+} // namespace PsDataTools
 
 /***********************************
  * FPsNetworkByteBuffer
@@ -29,12 +91,6 @@ FPsNetworkByteBuffer::FPsNetworkByteBuffer(const TArray<uint8>& InBuffer)
 bool FPsNetworkByteBuffer::Serialize(FArchive& Ar)
 {
 	Ar << *this;
-	return true;
-}
-
-bool FPsNetworkByteBuffer::Serialize(FStructuredArchive::FSlot Slot)
-{
-	Slot << *this;
 	return true;
 }
 
@@ -56,19 +112,7 @@ void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkByteBuffer& Value)
 	Slot << Value.Buffer;
 }
 
-template <>
-struct TStructOpsTypeTraits<FPsNetworkByteBuffer> : public TStructOpsTypeTraitsBase2<FPsNetworkByteBuffer>
-{
-	enum
-	{
-		WithZeroConstructor = true,
-		WithSerializer = true,
-		WithStructuredSerializer = true,
-		WithNetSerializer = true,
-		WithNetSharedSerialization = true,
-	};
-};
-IMPLEMENT_STRUCT(PsNetworkByteBuffer);
+UE_IMPLEMENT_STRUCT("/Script/PsData", PsNetworkByteBuffer);
 
 /***********************************
  * FPsNetworkEvent
@@ -79,22 +123,23 @@ FPsNetworkEvent::FPsNetworkEvent()
 {
 }
 
-FPsNetworkEvent::FPsNetworkEvent(EPsNetworkEventType InType, const FString& InPath, const TArray<uint8>& InBuffer)
+FPsNetworkEvent::FPsNetworkEvent(EPsNetworkEventType InType, const TArray<uint16>& InPath, const TArray<uint8>& InBuffer)
 	: Type(InType)
 	, Path(InPath)
 	, Data(InBuffer)
 {
 }
 
+FPsNetworkEvent::FPsNetworkEvent(EPsNetworkEventType InType, const TArray<uint16>& InPath)
+	: Type(InType)
+	, Path(InPath)
+{
+	check(InType == EPsNetworkEventType::Removed);
+}
+
 bool FPsNetworkEvent::Serialize(FArchive& Ar)
 {
 	Ar << *this;
-	return true;
-}
-
-bool FPsNetworkEvent::Serialize(FStructuredArchive::FSlot Slot)
-{
-	Slot << *this;
 	return true;
 }
 
@@ -109,25 +154,7 @@ bool FPsNetworkEvent::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuc
 FArchive& operator<<(FArchive& Ar, FPsNetworkEvent& Value)
 {
 	Ar << Value.Type;
-
-	if (Ar.IsLoading())
-	{
-		TArray<char> CharKey;
-		Ar << CharKey;
-
-		const auto Converter = FUTF8ToTCHAR(CharKey.GetData(), CharKey.Num());
-		Value.Path = FString(Converter.Length(), Converter.Get());
-	}
-	else if (Ar.IsSaving())
-	{
-		const auto Converter = FTCHARToUTF8(*Value.Path, Value.Path.Len());
-		TArray<char> CharKey(Converter.Get(), Converter.Length());
-		Ar << CharKey;
-	}
-	else
-	{
-		checkNoEntry();
-	}
+	Ar << Value.Path;
 
 	const bool bHasData = Value.Type != EPsNetworkEventType::Removed;
 	if (bHasData)
@@ -138,113 +165,22 @@ FArchive& operator<<(FArchive& Ar, FPsNetworkEvent& Value)
 	return Ar;
 }
 
-void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkEvent& Value)
-{
-	Slot << Value.Type;
-	Slot << Value.Path;
-	Slot << Value.Data;
-}
-
-template <>
-struct TStructOpsTypeTraits<FPsNetworkEvent> : public TStructOpsTypeTraitsBase2<FPsNetworkEvent>
-{
-	enum
-	{
-		WithZeroConstructor = true,
-		WithSerializer = true,
-		WithStructuredSerializer = true,
-		WithNetSerializer = true,
-		WithNetSharedSerialization = true,
-	};
-};
-IMPLEMENT_STRUCT(PsNetworkEvent);
+UE_IMPLEMENT_STRUCT("/Script/PsData", PsNetworkEvent);
 
 /***********************************
- * FPsNetworkEventBundle
+ * APsDataNetworkActor
  ***********************************/
 
-FPsNetworkEventBundle::FPsNetworkEventBundle()
-{
-}
-
-void FPsNetworkEventBundle::AddEvent(EPsNetworkEventType InType, const FString& InPath, const TArray<uint8>& InBuffer)
-{
-	check(InType != EPsNetworkEventType::None);
-	Events.Emplace(InType, InPath, InBuffer);
-}
-
-TArray<FPsNetworkEvent> FPsNetworkEventBundle::GetBundle() const
-{
-	return Events;
-}
-
-void FPsNetworkEventBundle::Reset()
-{
-	Events.Reset();
-}
-
-bool FPsNetworkEventBundle::HasEvents() const
-{
-	return Events.Num() > 0;
-}
-
-bool FPsNetworkEventBundle::Serialize(FArchive& Ar)
-{
-	Ar << *this;
-	return true;
-}
-
-bool FPsNetworkEventBundle::Serialize(FStructuredArchive::FSlot Slot)
-{
-	Slot << *this;
-	return true;
-}
-
-bool FPsNetworkEventBundle::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
-{
-	Ar << *this;
-
-	bOutSuccess = true;
-	return true;
-}
-
-FArchive& operator<<(FArchive& Ar, FPsNetworkEventBundle& Value)
-{
-	return Ar << Value.Events;
-}
-
-void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkEventBundle& Value)
-{
-	Slot << Value.Events;
-}
-
-template <>
-struct TStructOpsTypeTraits<FPsNetworkEventBundle> : public TStructOpsTypeTraitsBase2<FPsNetworkEventBundle>
-{
-	enum
-	{
-		WithZeroConstructor = true,
-		WithSerializer = true,
-		WithStructuredSerializer = true,
-		WithNetSerializer = true,
-		WithNetSharedSerialization = true,
-	};
-};
-IMPLEMENT_STRUCT(PsNetworkEventBundle);
-
-/***********************************
- * ADataNetworkActor
- ***********************************/
-
-ADataNetworkActor::ADataNetworkActor()
+APsDataNetworkActor::APsDataNetworkActor()
 	: State(EProxyState::Created)
 	, NetworkData(nullptr)
 {
 	bReplicates = true;
+	NetPriority = 10.f;
 	RootComponent = CreateDefaultSubobject<USceneComponent>("RootComponent");
 }
 
-bool ADataNetworkActor::IsAuthority() const
+bool APsDataNetworkActor::IsAuthority() const
 {
 	if (const auto Controller = Cast<APlayerController>(GetOwner()))
 	{
@@ -254,17 +190,17 @@ bool ADataNetworkActor::IsAuthority() const
 	return false;
 }
 
-bool ADataNetworkActor::IsConfirmed() const
+bool APsDataNetworkActor::IsConfirmed() const
 {
 	return State == EProxyState::Confirmed;
 }
 
-bool ADataNetworkActor::IsSynchronized() const
+bool APsDataNetworkActor::IsSynchronized() const
 {
 	return State == EProxyState::Synchronized;
 }
 
-void ADataNetworkActor::Open(UPsNetworkData* InNetworkData)
+void APsDataNetworkActor::Open(UPsNetworkData* InNetworkData)
 {
 	NetworkData = InNetworkData;
 
@@ -286,7 +222,7 @@ void ADataNetworkActor::Open(UPsNetworkData* InNetworkData)
 	}
 }
 
-void ADataNetworkActor::Close()
+void APsDataNetworkActor::Close()
 {
 	NetworkData = nullptr;
 
@@ -308,7 +244,7 @@ void ADataNetworkActor::Close()
 	Destroy();
 }
 
-void ADataNetworkActor::Synchronize(const FPsNetworkByteBuffer& Buffer)
+void APsDataNetworkActor::Synchronize(const TArray<FString>& Dictionary, const FPsNetworkByteBuffer& Buffer)
 {
 	if (State == EProxyState::Closed)
 	{
@@ -317,10 +253,11 @@ void ADataNetworkActor::Synchronize(const FPsNetworkByteBuffer& Buffer)
 
 	check(IsAuthority() && State == EProxyState::Confirmed);
 	State = EProxyState::Synchronized;
-	Client_Synchronize(Buffer);
+
+	Client_Synchronize(MakeDictionaryForReplication(Dictionary), Buffer);
 }
 
-void ADataNetworkActor::Send(const FPsNetworkEventBundle& Events)
+void APsDataNetworkActor::Send(const TArray<FString>& Dictionary, const TArray<FPsNetworkEvent>& Events)
 {
 	if (State == EProxyState::Closed)
 	{
@@ -328,10 +265,40 @@ void ADataNetworkActor::Send(const FPsNetworkEventBundle& Events)
 	}
 
 	check(IsAuthority() && State == EProxyState::Synchronized);
-	Client_Send(Events);
+	Client_Send(MakeDictionaryForReplication(Dictionary), Events);
 }
 
-void ADataNetworkActor::Server_Confirm_Implementation()
+TArray<FPsNetworkByteBuffer> APsDataNetworkActor::MakeDictionaryForReplication(const TArray<FString>& Dictionary)
+{
+	TArray<FPsNetworkByteBuffer> Buffers;
+	const auto DictionarySize = Dictionary.Num();
+	if (DictionarySize != LastDictionarySize)
+	{
+		FPsNetworkByteBuffer Buffer;
+		for (int32 i = LastDictionarySize; i < DictionarySize; ++i)
+		{
+			StringToBuffer(Dictionary[i], Buffer);
+			Buffers.Add(Buffer);
+		}
+		LastDictionarySize = DictionarySize;
+	}
+	return Buffers;
+}
+
+TArray<FString> APsDataNetworkActor::MakeDictionaryFromReplication(const TArray<FPsNetworkByteBuffer>& Dictionary) const
+{
+	TArray<FString> Strings;
+
+	FString String;
+	for (const auto& Buffer : Dictionary)
+	{
+		BufferToString(Buffer, String);
+		Strings.Add(String);
+	}
+	return Strings;
+}
+
+void APsDataNetworkActor::Server_Confirm_Implementation()
 {
 	check(IsAuthority());
 	UE_LOG(LogDataNetwork, Display, TEXT("Server proxy confirmed"));
@@ -340,16 +307,17 @@ void ADataNetworkActor::Server_Confirm_Implementation()
 	NetworkData->SynchronizePromise.Resolve();
 }
 
-void ADataNetworkActor::Client_Synchronize_Implementation(const FPsNetworkByteBuffer& Buffer)
+void APsDataNetworkActor::Client_Synchronize_Implementation(const TArray<FPsNetworkByteBuffer>& Dictionary, const FPsNetworkByteBuffer& Buffer)
 {
 	State = EProxyState::Synchronized;
-	NetworkData->Synchronize(Buffer);
+
+	NetworkData->Synchronize(MakeDictionaryFromReplication(Dictionary), Buffer);
 }
 
-void ADataNetworkActor::Client_Send_Implementation(const FPsNetworkEventBundle& Events)
+void APsDataNetworkActor::Client_Send_Implementation(const TArray<FPsNetworkByteBuffer>& Dictionary, const TArray<FPsNetworkEvent>& Events)
 {
 	check(State == EProxyState::Synchronized);
-	NetworkData->Apply(Events);
+	NetworkData->Apply(MakeDictionaryFromReplication(Dictionary), Events);
 }
 
 /***********************************
@@ -357,7 +325,8 @@ void ADataNetworkActor::Client_Send_Implementation(const FPsNetworkEventBundle& 
  ***********************************/
 
 UPsNetworkData::UPsNetworkData()
-	: NetUpdateFrequency(30.f)
+	: NetUpdateFrequency(0.f)
+	, bAccumulateEvents(true)
 	, AccumulatedTime(0.f)
 	, NumAuthorityProxies(0)
 	, bForceFlush(false)
@@ -389,7 +358,8 @@ void UPsNetworkData::OpenConnection(APlayerController* Controller) const
 		SpawnParameters.Owner = Controller;
 		SpawnParameters.Name = *FString::Printf(TEXT("DataNetworkActor_%s"), *Controller->GetName());
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		const auto Proxy = Controller->GetWorld()->SpawnActor<ADataNetworkActor>(SpawnParameters);
+		SpawnParameters.bNoFail = true;
+		const auto Proxy = Controller->GetWorld()->SpawnActor<APsDataNetworkActor>(SpawnParameters);
 		NetworkProxies.Add(Proxy);
 		Proxy->Open(const_cast<UPsNetworkData*>(this));
 
@@ -454,8 +424,8 @@ void UPsNetworkData::Flush()
 	bForceFlush = false;
 	if (HasAuthority())
 	{
-		TArray<ADataNetworkActor*> ConfirmedProxies;
-		TArray<ADataNetworkActor*> SynchronizedProxies;
+		TArray<APsDataNetworkActor*> ConfirmedProxies;
+		TArray<APsDataNetworkActor*> SynchronizedProxies;
 
 		for (const auto NetworkProxy : NetworkProxies)
 		{
@@ -466,7 +436,7 @@ void UPsNetworkData::Flush()
 					ConfirmedProxies.Add(NetworkProxy);
 				}
 
-				if (NetworkEvents.HasEvents())
+				if (NetworkEvents.Num() > 0)
 				{
 					if (NetworkProxy->IsSynchronized())
 					{
@@ -476,28 +446,23 @@ void UPsNetworkData::Flush()
 			}
 		}
 
-		const auto OutputBuffer = MakeShared<FPsDataBufferOutputStream>();
-		if (SynchronizedProxies.Num() > 0)
-		{
-			const FPsNetworkByteBuffer Buffer(OutputBuffer->GetBuffer());
-			for (const auto NetworkObject : SynchronizedProxies)
-			{
-				NetworkObject->Send(NetworkEvents);
-			}
-		}
-
 		if (ConfirmedProxies.Num() > 0)
 		{
-			OutputBuffer->Reset();
-			FPsDataBinarySerializer Serializer(OutputBuffer);
+			const auto OutputBuffer = MakeShared<FPsDataBufferOutputStream>();
+			FPsDataOptimizedBinarySerializer Serializer(OutputBuffer, &Dictionary);
 			Serializer.bWriteDefaults = false;
 			DataSerialize(&Serializer);
 
 			const FPsNetworkByteBuffer Buffer(OutputBuffer->GetBuffer());
-			for (const auto NetworkObject : ConfirmedProxies)
+			for (const auto NetworkProxy : ConfirmedProxies)
 			{
-				NetworkObject->Synchronize(Buffer);
+				NetworkProxy->Synchronize(Dictionary, Buffer);
 			}
+		}
+
+		for (const auto NetworkProxy : SynchronizedProxies)
+		{
+			NetworkProxy->Send(Dictionary, NetworkEvents);
 		}
 	}
 
@@ -537,10 +502,10 @@ TStatId UPsNetworkData::GetStatId() const
 
 void UPsNetworkData::CommitChanges(const UPsData* Data, const FDataField* Field)
 {
-	if (!Field->Context->IsData())
+	if (!Field->Context->IsData() && !Field->Meta.bHidden)
 	{
 		const auto OutputBuffer = MakeShared<FPsDataBufferOutputStream>();
-		FPsDataBinarySerializer Serializer(OutputBuffer);
+		FPsDataOptimizedBinarySerializer Serializer(OutputBuffer, &Dictionary);
 		Serializer.bWriteDefaults = false;
 		const auto Property = FPsDataFriend::GetProperty(Data, Field->Index);
 		Property->Serialize(&Serializer);
@@ -549,23 +514,39 @@ void UPsNetworkData::CommitChanges(const UPsData* Data, const FDataField* Field)
 		Path.AppendChar('.');
 		Path.Append(Field->Name);
 
-		NetworkEvents.AddEvent(EPsNetworkEventType::Changed, Path, OutputBuffer->GetBuffer());
+		NetworkEvents.Emplace(EPsNetworkEventType::Changed, EncodePath(Path, Dictionary), OutputBuffer->GetBuffer());
+
+		if (!bAccumulateEvents)
+		{
+			Flush();
+		}
 	}
 }
 
 void UPsNetworkData::CommitAddedEvent(const UPsData* Data)
 {
 	const auto OutputBuffer = MakeShared<FPsDataBufferOutputStream>();
-	FPsDataBinarySerializer Serializer(OutputBuffer);
+	FPsDataOptimizedBinarySerializer Serializer(OutputBuffer, &Dictionary);
 	Serializer.bWriteDefaults = false;
-	Data->DataSerialize(&Serializer);
 
-	NetworkEvents.AddEvent(EPsNetworkEventType::Added, Data->GetPathFromData(this), OutputBuffer->GetBuffer());
+	UPsDataUPsDataLibrary::TypeSerialize(Data->GetParent(), Data->GetParentField(), &Serializer, Data);
+
+	NetworkEvents.Emplace(EPsNetworkEventType::Added, EncodePath(Data->GetPathFromData(this), Dictionary), OutputBuffer->GetBuffer());
+
+	if (!bAccumulateEvents)
+	{
+		Flush();
+	}
 }
 
 void UPsNetworkData::CommitRemovingEvent(const UPsData* Data)
 {
-	NetworkEvents.AddEvent(EPsNetworkEventType::Removed, Data->GetPathFromData(this), {});
+	NetworkEvents.Emplace(EPsNetworkEventType::Removed, EncodePath(Data->GetPathFromData(this), Dictionary));
+
+	if (!bAccumulateEvents)
+	{
+		Flush();
+	}
 }
 
 void UPsNetworkData::HandlingControllers()
@@ -581,7 +562,7 @@ void UPsNetworkData::HandlingControllers()
 			}
 			else
 			{
-				for (TActorIterator<ADataNetworkActor> ActorIterator(PendingController->GetWorld()); ActorIterator; ++ActorIterator)
+				for (TActorIterator<APsDataNetworkActor> ActorIterator(PendingController->GetWorld()); ActorIterator; ++ActorIterator)
 				{
 					const auto PendingActor = *ActorIterator;
 					if (PendingActor->GetOwner() == PendingController)
@@ -596,29 +577,32 @@ void UPsNetworkData::HandlingControllers()
 	}
 }
 
-void UPsNetworkData::Synchronize(const FPsNetworkByteBuffer& Buffer)
+void UPsNetworkData::Synchronize(const TArray<FString>& DictionaryDiff, const FPsNetworkByteBuffer& Buffer)
 {
 	check(!HasAuthority());
 
+	Dictionary.Append(DictionaryDiff);
+
 	DEFERRED_EVENT_PROCESSING();
 	const auto InputBuffer = MakeShared<FPsDataBufferInputStream>(Buffer.Buffer);
-	FPsDataBinaryDeserializer Deserializer(InputBuffer);
+	FPsDataOptimizedBinaryDeserializer Deserializer(InputBuffer, &Dictionary);
 	DataDeserialize(&Deserializer, false);
 
 	UE_LOG(LogDataNetwork, Display, TEXT("Client proxy synchronized"));
 	SynchronizePromise.Resolve();
 }
 
-void UPsNetworkData::Apply(const FPsNetworkEventBundle& Events)
+void UPsNetworkData::Apply(const TArray<FString>& DictionaryDiff, const TArray<FPsNetworkEvent>& Events)
 {
 	check(!HasAuthority());
 
+	Dictionary.Append(DictionaryDiff);
+
 	DEFERRED_EVENT_PROCESSING();
 
-	const auto EventsList = Events.GetBundle();
-	for (const auto& Event : EventsList)
+	for (const auto& Event : Events)
 	{
-		TDataPathExecutor<true, true> PathExecutor(this, Event.Path);
+		TDataPathExecutor<true, true> PathExecutor(this, DecodePath(Event.Path, Dictionary));
 
 		FAbstractDataProperty* Property;
 		if (PathExecutor.Execute(Property))
@@ -644,7 +628,7 @@ void UPsNetworkData::Apply(const FPsNetworkEventBundle& Events)
 
 bool UPsNetworkData::ApplyChanged(FAbstractDataProperty* Property, const FPsNetworkByteBuffer& Buffer) const
 {
-	FPsDataBinaryDeserializer Deserializer(MakeShared<FPsDataBufferInputStream>(Buffer.Buffer));
+	FPsDataOptimizedBinaryDeserializer Deserializer(MakeShared<FPsDataBufferInputStream>(Buffer.Buffer), &Dictionary);
 	Property->Deserialize(&Deserializer);
 	return true;
 }
@@ -654,7 +638,7 @@ bool UPsNetworkData::ApplyAddedEvent(FAbstractDataProperty* Property, const FStr
 	const auto Field = Property->GetField();
 	check(Field->Context->IsData());
 
-	FPsDataBinaryDeserializer Deserializer(MakeShared<FPsDataBufferInputStream>(Buffer.Buffer));
+	FPsDataOptimizedBinaryDeserializer Deserializer(MakeShared<FPsDataBufferInputStream>(Buffer.Buffer), &Dictionary);
 	UPsData* NewData = static_cast<UPsData*>(UPsDataUPsDataLibrary::TypeDeserialize(Property->GetOwner(), Field, &Deserializer, nullptr));
 
 	if (Field->Context->IsArray())

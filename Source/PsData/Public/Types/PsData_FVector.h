@@ -1,4 +1,4 @@
-// Copyright 2015-2023 MY.GAMES. All Rights Reserved.
+// Copyright 2015-2024 MY.GAMES. All Rights Reserved.
 
 #pragma once
 
@@ -9,44 +9,44 @@
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 
-#include "PsData_FLinearColor.generated.h"
+#include "PsData_FVector.generated.h"
 
 UCLASS(meta = (CustomThunkTemplates = "FCustomThunkTemplates_PsData"))
-class PSDATA_API UPsDataFLinearColorLibrary : public UBlueprintFunctionLibrary
+class PSDATA_API UPsDataFVectorLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
 	/** Get property */
 	UFUNCTION(BlueprintPure, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataOut = "Out"))
-	static void GetProperty(UPsData* Target, int32 Index, FLinearColor& Out);
+	static void GetProperty(UPsData* Target, int32 Index, FVector& Out);
 
 	/** Set property */
 	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataIn = "Value"))
-	static void SetProperty(UPsData* Target, int32 Index, const FLinearColor& Value);
+	static void SetProperty(UPsData* Target, int32 Index, const FVector& Value);
 
 	/** Get array property */
 	UFUNCTION(BlueprintPure, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataOut = "Out"))
-	static void GetArrayProperty(UPsData* Target, int32 Index, TArray<FLinearColor>& Out);
+	static void GetArrayProperty(UPsData* Target, int32 Index, TArray<FVector>& Out);
 
 	/** Set array property */
 	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataIn = "Value"))
-	static void SetArrayProperty(UPsData* Target, int32 Index, const TArray<FLinearColor>& Value);
+	static void SetArrayProperty(UPsData* Target, int32 Index, const TArray<FVector>& Value);
 
 	/** Get map property */
 	UFUNCTION(BlueprintPure, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataOut = "Out"))
-	static void GetMapProperty(UPsData* Target, int32 Index, TMap<FString, FLinearColor>& Out);
+	static void GetMapProperty(UPsData* Target, int32 Index, TMap<FString, FVector>& Out);
 
 	/** Set map property */
 	UFUNCTION(BlueprintCallable, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataIn = "Value"))
-	static void SetMapProperty(UPsData* Target, int32 Index, const TMap<FString, FLinearColor>& Value);
+	static void SetMapProperty(UPsData* Target, int32 Index, const TMap<FString, FVector>& Value);
 
 	/** Get link value */
 	UFUNCTION(BlueprintPure, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataOut = "Out"))
-	static void GetLinkValue(UPsData* Target, int32 Index, FLinearColor& Out);
+	static void GetLinkValue(UPsData* Target, int32 Index, FVector& Out);
 
 	/** Get array link value */
 	UFUNCTION(BlueprintPure, CustomThunk, Category = "PsData|Data", meta = (PsDataTarget = "Target", PsDataIndex = "Index", PsDataOut = "Out"))
-	static void GetArrayLinkValue(UPsData* Target, int32 Index, TArray<FLinearColor>& Out);
+	static void GetArrayLinkValue(UPsData* Target, int32 Index, TArray<FVector>& Out);
 
 	DECLARE_FUNCTION(execGetProperty);
 	DECLARE_FUNCTION(execSetProperty);
@@ -58,40 +58,40 @@ class PSDATA_API UPsDataFLinearColorLibrary : public UBlueprintFunctionLibrary
 	DECLARE_FUNCTION(execGetArrayLinkValue);
 
 public:
-	static void TypeSerialize(const UPsData* const Instance, const FDataField* Field, FPsDataSerializer* Serializer, const FLinearColor& Value);
-	static FLinearColor TypeDeserialize(const UPsData* const Instance, const FDataField* Field, FPsDataDeserializer* Deserializer, const FLinearColor& Value);
+	static void TypeSerialize(const UPsData* const Instance, const FDataField* Field, FPsDataSerializer* Serializer, const FVector& Value);
+	static FVector TypeDeserialize(const UPsData* const Instance, const FDataField* Field, FPsDataDeserializer* Deserializer, const FVector& Value);
 };
 
 namespace PsDataTools
 {
 template <>
-struct TTypeDefault<FLinearColor>
+struct TTypeDefault<FVector>
 {
-	static const FLinearColor GetDefaultValue() { return FLinearColor::Black; }
+	static const FVector GetDefaultValue() { return FVector::ZeroVector; }
 };
 
 template <>
-struct TDataTypeContext<FLinearColor> : public TDataTypeContextExtended<FLinearColor, UPsDataFLinearColorLibrary>
-{
-};
-
-template <>
-struct TDataTypeContext<TArray<FLinearColor>> : public TDataTypeContextExtended<TArray<FLinearColor>, UPsDataFLinearColorLibrary>
+struct TDataTypeContext<FVector> : public TDataTypeContextExtended<FVector, UPsDataFVectorLibrary>
 {
 };
 
 template <>
-struct TDataTypeContext<TMap<FString, FLinearColor>> : public TDataTypeContextExtended<TMap<FString, FLinearColor>, UPsDataFLinearColorLibrary>
+struct TDataTypeContext<TArray<FVector>> : public TDataTypeContextExtended<TArray<FVector>, UPsDataFVectorLibrary>
 {
 };
 
 template <>
-struct TTypeSerializer<FLinearColor> : public TTypeSerializerExtended<FLinearColor, UPsDataFLinearColorLibrary>
+struct TDataTypeContext<TMap<FString, FVector>> : public TDataTypeContextExtended<TMap<FString, FVector>, UPsDataFVectorLibrary>
 {
 };
 
 template <>
-struct TTypeDeserializer<FLinearColor> : public TTypeDeserializerExtended<FLinearColor, UPsDataFLinearColorLibrary>
+struct TTypeSerializer<FVector> : public TTypeSerializerExtended<FVector, UPsDataFVectorLibrary>
+{
+};
+
+template <>
+struct TTypeDeserializer<FVector> : public TTypeDeserializerExtended<FVector, UPsDataFVectorLibrary>
 {
 };
 

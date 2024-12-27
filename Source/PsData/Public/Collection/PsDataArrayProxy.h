@@ -226,6 +226,26 @@ public:
 		return nullptr;
 	}
 
+	bool Contains(PsDataTools::TConstRefType<T> Element) const
+	{
+		return Property->GetValue().Contains(Element);
+	}
+
+	template <typename PredicateType>
+	bool ContainsByPredicate(const PredicateType& Predicate) const
+	{
+		for (auto It = Property->GetValue().CreateConstIterator(); It; ++It)
+		{
+			PsDataTools::TConstRefType<T> Item = *It;
+			if (Predicate(Item))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	PsDataTools::TConstRefType<T, bConst> Get(int32 Index)
 	{
 		return Property->GetValue()[Index];

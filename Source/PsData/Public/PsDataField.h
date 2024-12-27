@@ -19,6 +19,7 @@ struct PSDATA_API FDataMetaType
 {
 	static const FDataStringViewChar Strict;
 	static const FDataStringViewChar Event;
+	static const FDataStringViewChar EventStorage;
 	static const FDataStringViewChar Bubbles;
 	static const FDataStringViewChar Alias;
 	static const FDataStringViewChar ReadOnly;
@@ -73,6 +74,7 @@ struct PSDATA_API FDataFieldMeta
 {
 	bool bStrict;
 	bool bEvent;
+	bool bEventStorage;
 	bool bBubbles;
 	bool bDeprecated;
 	bool bReadOnly;

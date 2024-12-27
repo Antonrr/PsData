@@ -282,6 +282,17 @@ void FPsDataFastJsonSerializer::AppendSpace()
 {
 	if (bPretty)
 	{
+		if (Buffer.Num() == 0)
+		{
+			return;
+		}
+
+		if (Buffer.Last() == ':')
+		{
+			Buffer.Add(' ');
+			return;
+		}
+
 		Buffer.Add('\n');
 		for (int32 i = 0; i < Depth; ++i)
 		{
@@ -312,7 +323,7 @@ void FPsDataFastJsonSerializer::WriteKey(const FString& Key)
 void FPsDataFastJsonSerializer::WriteArray()
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	++Depth;
 	Buffer.Add('[');
@@ -321,7 +332,7 @@ void FPsDataFastJsonSerializer::WriteArray()
 void FPsDataFastJsonSerializer::WriteObject()
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	++Depth;
 	Buffer.Add('{');
@@ -330,7 +341,7 @@ void FPsDataFastJsonSerializer::WriteObject()
 void FPsDataFastJsonSerializer::WriteValue(int32 Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	PsDataTools::Numbers::ToString(Value, Buffer);
 }
@@ -338,7 +349,7 @@ void FPsDataFastJsonSerializer::WriteValue(int32 Value)
 void FPsDataFastJsonSerializer::WriteValue(int64 Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	PsDataTools::Numbers::ToString(Value, Buffer);
 }
@@ -346,7 +357,7 @@ void FPsDataFastJsonSerializer::WriteValue(int64 Value)
 void FPsDataFastJsonSerializer::WriteValue(uint8 Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	PsDataTools::Numbers::ToString(Value, Buffer);
 }
@@ -354,7 +365,7 @@ void FPsDataFastJsonSerializer::WriteValue(uint8 Value)
 void FPsDataFastJsonSerializer::WriteValue(float Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	PsDataTools::Numbers::ToString(Value, Buffer);
 }
@@ -362,7 +373,7 @@ void FPsDataFastJsonSerializer::WriteValue(float Value)
 void FPsDataFastJsonSerializer::WriteValue(bool Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	if (Value)
 	{
@@ -377,7 +388,7 @@ void FPsDataFastJsonSerializer::WriteValue(bool Value)
 void FPsDataFastJsonSerializer::WriteValue(const FString& Value)
 {
 	AppendComma();
-	AppendValueSpace();
+	AppendSpace();
 
 	AppendStringAsJsonString(Buffer, Value.GetCharArray().GetData(), 0, Value.Len());
 }
@@ -394,7 +405,7 @@ void FPsDataFastJsonSerializer::WriteValue(const UPsData* Value)
 	if (Value == nullptr)
 	{
 		AppendComma();
-		AppendValueSpace();
+		AppendSpace();
 
 		Buffer.Append(TEXT("null"), 4);
 	}

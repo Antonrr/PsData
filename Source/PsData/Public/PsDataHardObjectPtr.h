@@ -11,7 +11,7 @@
 template <class T>
 class THardObjectPtr : public FGCObject
 {
-	T* Value;
+	TObjectPtr<T> Value;
 
 public:
 	THardObjectPtr()
@@ -20,15 +20,13 @@ public:
 	}
 
 	THardObjectPtr(T* NewValue)
-		: Value(nullptr)
+		: Value(NewValue)
 	{
-		Set(NewValue);
 	}
 
 	THardObjectPtr(const THardObjectPtr& Other)
-		: Value(nullptr)
+		: Value(Other.Value)
 	{
-		Set(Other.Value);
 	}
 
 	THardObjectPtr(THardObjectPtr&& Other) noexcept
@@ -41,9 +39,8 @@ public:
 		typename OtherType,
 		typename = typename TEnableIf<TPointerIsConvertibleFromTo<OtherType, T>::Value>::Type>
 	THardObjectPtr(const THardObjectPtr<OtherType>& Other)
-		: Value(nullptr)
+		: Value(Other.Value)
 	{
-		Set(Other.Value);
 	}
 
 	template <
@@ -70,7 +67,7 @@ public:
 
 	T* Get() const
 	{
-		return Value;
+		return ToRawPtr(Value);
 	}
 
 	bool IsValid() const
@@ -90,12 +87,12 @@ public:
 
 	T* operator*() const
 	{
-		return Value;
+		return ToRawPtr(Value);
 	}
 
 	T* operator->() const
 	{
-		return Value;
+		return ToRawPtr(Value);
 	}
 
 	void operator=(T* NewValue)

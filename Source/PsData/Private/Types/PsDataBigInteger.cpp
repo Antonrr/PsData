@@ -2,6 +2,8 @@
 
 #include "Types/PsDataBigInteger.h"
 
+#include "PsDataDefines.h"
+
 const int32 FPsDataBigInteger::NumBytesPerWord = sizeof(PsDataBigIntegerWordType);
 const int32 FPsDataBigInteger::NumBitsPerWord = NumBytesPerWord * 8;
 const PsDataBigIntegerWordType FPsDataBigInteger::MaxWordMask = ~static_cast<PsDataBigIntegerWordType>(0);
@@ -105,7 +107,7 @@ FPsDataBigInteger::FPsDataBigInteger(const char* Value)
 	}
 	else
 	{
-		UE_LOG(LogDataUtils, Fatal, TEXT("Can't deserialize \"%s\" to FPsDataBigInteger"), *Value);
+		UE_LOG(LogDataUtils, Fatal, TEXT("Can't deserialize \"%s\" to FPsDataBigInteger"), *FString(Value));
 	}
 }
 
@@ -255,7 +257,7 @@ FPsDataShortBigInteger FPsDataBigInteger::ToShortBigInteger(int32 NumDigits) con
 {
 	check(NumDigits > 0 && NumDigits < 19);
 
-	static const auto DigitShift = FMath::Log2(10);
+	static const auto DigitShift = FMath::FloorLog2(10);
 	const auto MaxValue = Pow(Ten, NumDigits);
 
 	auto Temp = *this;
@@ -1071,7 +1073,15 @@ bool FPsDataBigInteger::ExportTextItem(FString& ValueStr, FPsDataBigInteger cons
 
 bool FPsDataBigInteger::ImportTextItem(const TCHAR*& Buffer, int32 PortFlags, UObject* Parent, FOutputDevice* ErrorText)
 {
-	const auto BufferView = PsDataTools::ToStringView(Buffer);
+	FString NewBuffer;
+	Buffer = FPropertyHelpers::ReadToken(Buffer, NewBuffer, true);
+	if (NewBuffer == "-")
+	{
+		Buffer++;
+		Buffer = FPropertyHelpers::ReadToken(Buffer, NewBuffer, true);
+	}
+
+	const auto BufferView = PsDataTools::ToStringView(NewBuffer);
 	if (BufferView.Len() == 0)
 	{
 		Set(0);
@@ -1100,6 +1110,13 @@ bool FPsDataBigInteger::Serialize(FStructuredArchive::FSlot Slot)
 	return true;
 }
 
+bool FPsDataBigInteger::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+	Ar << *this;
+	bOutSuccess = true;
+	return true;
+}
+
 FArchive& operator<<(FArchive& Ar, FPsDataBigInteger& Value)
 {
 	return Ar << Value.Words;
@@ -1110,16 +1127,4 @@ void operator<<(FStructuredArchive::FSlot Slot, FPsDataBigInteger& Value)
 	Slot << Value.Words;
 }
 
-template <>
-struct TStructOpsTypeTraits<FPsDataBigInteger> : public TStructOpsTypeTraitsBase2<FPsDataBigInteger>
-{
-	enum
-	{
-		WithIdenticalViaEquality = true,
-		WithExportTextItem = true,
-		WithImportTextItem = true,
-		WithSerializer = true,
-		WithStructuredSerializer = true,
-	};
-};
-IMPLEMENT_STRUCT(PsDataBigInteger);
+UE_IMPLEMENT_STRUCT("/Script/PsData", PsDataBigInteger);

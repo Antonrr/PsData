@@ -108,9 +108,23 @@ public:
 
 	static bool IsBaseClass(const UClass* Class);
 
+	static bool IsCompiled();
 	static void Compile();
 	static void CompileClass(UClass* Class, bool bHasCycDep);
 	static void CompileClassInstance(UPsData* Instance, bool bGenerateStruct);
+
+	static void PrintTypeInfo(const FString& Type);
+
+	using FFieldPair = TTuple<UClass*, const FDataField*>;
+	using FLinkPair = TTuple<UClass*, const FDataLink*>;
+
+	static TArray<FFieldPair> GetParentFieldForClass(const UClass* Class);
+	static TArray<FLinkPair> GetParentLinkForClass(const UClass* Class);
+
+	static TArray<TArray<FFieldPair>> GetParentChain(const UClass* Class, bool bFields, bool bLinks);
+
+private:
+	static void GetParentChainInternal(TArray<TArray<TTuple<UClass*, const FDataField*>>>& InOutList);
 };
 
 /***********************************
@@ -172,12 +186,7 @@ struct TDataTypeContextExtended : public FAbstractDataTypeContext
 template <typename T>
 UClass* GetClass()
 {
-#if UE_BUILD_SHIPPING
-	static const auto Class = FindObjectChecked<UClass>(ANY_PACKAGE, &((*FType<T>::ContentType())[1]));
-	return Class;
-#else
-	return FindObjectChecked<UClass>(ANY_PACKAGE, &((*FType<T>::ContentType())[1]));
-#endif
+	return FindUClass<T>();
 }
 
 template <typename T>
@@ -697,12 +706,6 @@ struct TDataPathExecutor
 		Keys.Add(Key);
 	}
 
-private:
-	void PrependKey(const FString& Key)
-	{
-		Keys.Insert(Key, 0);
-	}
-
 	bool Normalize()
 	{
 		if (!Field)
@@ -729,6 +732,12 @@ private:
 		}
 
 		return Field != nullptr;
+	}
+
+private:
+	void PrependKey(const FString& Key)
+	{
+		Keys.Insert(Key, 0);
 	}
 
 	UPsData* Data;

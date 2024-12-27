@@ -77,6 +77,17 @@ public:
 public:
 	static uint8* CreateStructFromJson(const UStruct* Struct, const TSharedRef<FJsonObject>& JsonObject, bool bInitialize = true);
 	static uint8* CreateStructFromJson_Import(const UStruct* Struct, const TSharedRef<FJsonObject>& JsonObject, TArray<FString>& ImportProblems);
+	static bool IsStructAsText(const UStruct* Struct);
+
+	template <typename T>
+	static T CreateStructFromJson(const TSharedRef<FJsonObject>& JsonObject)
+	{
+		T Result;
+		void* Raw = CreateStructFromJson(T::StaticStruct(), JsonObject, true);
+		Result = *static_cast<T*>(Raw);
+		FMemory::Free(Raw);
+		return Result;
+	}
 
 private:
 	static void PropertyDeserialize(FProperty* Property, uint8* OutDest, const TSharedRef<FJsonValue>& JsonValue);
@@ -135,6 +146,12 @@ public:
 public:
 	static TSharedPtr<FJsonObject> CreateJsonFromStruct(const UStruct* Struct, const void* Value);
 	static TSharedPtr<FJsonObject> CreateJsonFromStruct_Export(const UStruct* Struct, const void* Value);
+
+	template <typename T>
+	static TSharedPtr<FJsonObject> CreateJsonFromStruct(const T& Value)
+	{
+		return CreateJsonFromStruct(T::StaticStruct(), &Value);
+	}
 
 private:
 	static TSharedPtr<FJsonValue> PropertySerialize(FProperty* Property, const void* Value);

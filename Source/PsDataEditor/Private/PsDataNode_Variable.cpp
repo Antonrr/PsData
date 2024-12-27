@@ -254,6 +254,12 @@ void UPsDataNode_Variable::ValidateNodeDuringCompilation(class FCompilerResultsL
 {
 	Super::ValidateNodeDuringCompilation(MessageLog);
 
+	if (!PsDataTools::FDataReflection::IsCompiled())
+	{
+		MessageLog.Error(*LOCTEXT("UPsDataNode_Variable", "Node @@: PsData not ready").ToString(), this);
+		return;
+	}
+
 	const auto Field = GetProperty();
 	if (!Field)
 	{

@@ -13,6 +13,53 @@ FPsDataBufferInputStream::FPsDataBufferInputStream(const TArray<uint8>& InBuffer
 {
 }
 
+uint8 FPsDataBufferInputStream::ReadUint8()
+{
+	CheckRange();
+	PrevIndex = Index;
+	const auto b0 = Buffer[Index];
+	Index += 1;
+	return b0;
+}
+
+int8 FPsDataBufferInputStream::ReadInt8()
+{
+	const uint8 Value = ReadUint8();
+	if ((Value & 0x80) == 0)
+	{
+		return static_cast<uint8>(Value);
+	}
+	else
+	{
+		const auto PosValue = static_cast<int8>(Value ^ 0x80);
+		return PosValue == 0 ? TNumericLimits<int8>::Min() : -PosValue;
+	}
+}
+
+uint16 FPsDataBufferInputStream::ReadUint16()
+{
+	CheckRange();
+	PrevIndex = Index;
+	const uint16 b0 = (static_cast<uint16>(Buffer[Index + 0]) << 8);
+	const uint16 b1 = (static_cast<uint16>(Buffer[Index + 1]) << 0);
+	Index += 2;
+	return b0 | b1;
+}
+
+int16 FPsDataBufferInputStream::ReadInt16()
+{
+	const uint16 Value = ReadUint16();
+	if ((Value & 0x8000) == 0)
+	{
+		return static_cast<int16>(Value);
+	}
+	else
+	{
+		const auto PosValue = static_cast<int16>(Value ^ 0x8000);
+		return PosValue == 0 ? TNumericLimits<int16>::Min() : -PosValue;
+	}
+}
+
 uint32 FPsDataBufferInputStream::ReadUint32()
 {
 	CheckRange();
@@ -34,7 +81,8 @@ int32 FPsDataBufferInputStream::ReadInt32()
 	}
 	else
 	{
-		return static_cast<int32>(Value ^ 0x80000000) * -1;
+		const auto PosValue = static_cast<int32>(Value ^ 0x80000000);
+		return PosValue == 0 ? TNumericLimits<int32>::Min() : -PosValue;
 	}
 }
 
@@ -63,17 +111,9 @@ int64 FPsDataBufferInputStream::ReadInt64()
 	}
 	else
 	{
-		return static_cast<int64>(Value ^ 0x8000000000000000) * -1;
+		const auto PosValue = static_cast<int64>(Value ^ 0x8000000000000000);
+		return PosValue == 0 ? TNumericLimits<int64>::Min() : -PosValue;
 	}
-}
-
-uint8 FPsDataBufferInputStream::ReadUint8()
-{
-	CheckRange();
-	PrevIndex = Index;
-	const auto b0 = Buffer[Index];
-	Index += 1;
-	return b0;
 }
 
 float FPsDataBufferInputStream::ReadFloat()

@@ -288,8 +288,16 @@ public:
 	{
 		struct TPair
 		{
+			using ValueType = PsDataTools::TConstValueType<T, bIteratorConst>;
+
 			const FString Key;
-			PsDataTools::TConstValueType<T, bIteratorConst> Value;
+			ValueType Value;
+
+			TPair(const FString& InKey, const ValueType& InValue)
+				: Key(InKey)
+				, Value(InValue)
+			{
+			}
 
 			TPair(const TPair&) = delete;
 			TPair& operator=(const TPair&) = delete;
@@ -316,7 +324,7 @@ public:
 				Pairs.Reserve(Map.Num());
 				for (const auto& Pair : Map)
 				{
-					Pairs.Add({Pair.Key, Pair.Value});
+					Pairs.Add(TPair(Pair.Key, Pair.Value));
 				}
 			}
 		}

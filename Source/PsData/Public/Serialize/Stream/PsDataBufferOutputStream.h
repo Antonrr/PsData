@@ -25,11 +25,14 @@ public:
 	void Reset();
 	void Reserve(int32 NumBytes);
 
+	virtual void WriteUint8(uint8 Value) override;
+	virtual void WriteInt8(int8 Value) override;
+	virtual void WriteUint16(uint16 Value) override;
+	virtual void WriteInt16(int16 Value) override;
 	virtual void WriteUint32(uint32 Value) override;
 	virtual void WriteInt32(int32 Value) override;
 	virtual void WriteUint64(uint64 Value) override;
 	virtual void WriteInt64(int64 Value) override;
-	virtual void WriteUint8(uint8 Value) override;
 	virtual void WriteFloat(float Value) override;
 	virtual void WriteBool(bool Value) override;
 	virtual void WriteTCHAR(TCHAR Value) override;

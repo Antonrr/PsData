@@ -17,6 +17,11 @@ void UPsDataNode_GetVariable::AllocateDefaultPins()
 	Super::AllocateDefaultPins();
 }
 
+void UPsDataNode_GetVariable::SetFromFunction(const UFunction* Function)
+{
+	Super::SetFromFunction(Function);
+}
+
 FText UPsDataNode_GetVariable::GetMenuCategory() const
 {
 	return FText::FromString(TEXT("PsData"));

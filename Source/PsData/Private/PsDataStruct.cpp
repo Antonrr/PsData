@@ -40,6 +40,26 @@ struct FDataPropertyFlags
 };
 
 #if OLD_PROPERTY_STYLE
+void AddToOwner(UField* Owner, FProperty* Property)
+#else
+void AddToOwner(const FFieldVariant& Owner, FProperty* Property)
+#endif
+{
+#if OLD_PROPERTY_STYLE
+	Owner->AddCppProperty(Property);
+#else
+	if (Owner.IsUObject())
+	{
+		CastChecked<UField>(Owner.ToUObject())->AddCppProperty(Property);
+	}
+	else
+	{
+		Owner.ToField()->AddCppProperty(Property);
+	}
+#endif
+}
+
+#if OLD_PROPERTY_STYLE
 FProperty* CreateSingleProperty(bool bTypeFromField, UField* Owner, FProperty* BaseProperty, const FDataField* Field, FDataPropertyFlags Flags, const FString& Postfix = TEXT(""))
 #else
 FProperty* CreateSingleProperty(bool bTypeFromField, const FFieldVariant& Owner, FProperty* BaseProperty, const FDataField* Field, FDataPropertyFlags Flags, const FString& Postfix = TEXT(""))
@@ -89,18 +109,7 @@ FProperty* CreateSingleProperty(bool bTypeFromField, const FFieldVariant& Owner,
 		}
 	}
 
-#if OLD_PROPERTY_STYLE
-	Owner->AddCppProperty(Property);
-#else
-	if (Owner.IsUObject())
-	{
-		CastChecked<UField>(Owner.ToUObject())->AddCppProperty(Property);
-	}
-	else
-	{
-		Owner.ToField()->AddCppProperty(Property);
-	}
-#endif
+	AddToOwner(Owner, Property);
 
 	return Property;
 }
@@ -120,6 +129,8 @@ FProperty* CreateProperty(const FFieldVariant& Owner, FProperty* BaseProperty, c
 		FArrayProperty* ArrayProperty = NewProperty<FArrayProperty>(Owner, *Field->GetNameForSerialize(), Flags.ObjectFlags, Flags.PropertyFlags);
 		CreateSingleProperty(true, ArrayProperty, BaseArrayProperty->Inner, Field, RF_Public, TEXT("Value"));
 		Property = ArrayProperty;
+
+		AddToOwner(Owner, Property);
 	}
 	else if (Field->Context->IsMap())
 	{
@@ -128,6 +139,8 @@ FProperty* CreateProperty(const FFieldVariant& Owner, FProperty* BaseProperty, c
 		CreateSingleProperty(false, MapProperty, BaseMapProperty->KeyProp, Field, RF_Public, TEXT("Key"));
 		CreateSingleProperty(true, MapProperty, BaseMapProperty->ValueProp, Field, RF_Public, TEXT("Value"));
 		Property = MapProperty;
+
+		AddToOwner(Owner, Property);
 	}
 	else
 	{
@@ -182,7 +195,7 @@ UPsDataStruct* UPsDataStruct::Find(UClass* PsDataClass)
 	check(PsDataClass && PsDataClass->IsChildOf(UPsData::StaticClass()));
 
 	const auto StructName = GetStructName(PsDataClass);
-	if (UPsDataStruct* ExistingStruct = FindObject<UPsDataStruct>(PsDataClass, *StructName))
+	if (UPsDataStruct* ExistingStruct = FindObject<UPsDataStruct>(PsDataClass->GetPackage(), *StructName))
 	{
 		return ExistingStruct;
 	}
@@ -195,18 +208,25 @@ UPsDataStruct* UPsDataStruct::Create(UClass* PsDataClass, UPsData* DefaultData)
 	check(PsDataClass && PsDataClass->IsChildOf(UPsData::StaticClass()) && DefaultData);
 
 	UScriptStruct* SuperStruct = nullptr;
-	if (PsDataClass->GetSuperClass() != UPsData::StaticClass())
+	const auto PsDataSuperClass = PsDataClass->GetSuperClass();
+	if (!PsDataTools::FDataReflection::IsBaseClass(PsDataSuperClass))
 	{
-		SuperStruct = Create(PsDataClass->GetSuperClass(), DefaultData);
+		const auto SuperStructName = GetStructName(PsDataSuperClass);
+		SuperStruct = FindObject<UPsDataStruct>(PsDataSuperClass->GetPackage(), *SuperStructName);
+
+		if (!SuperStruct)
+		{
+			SuperStruct = Create(PsDataClass->GetSuperClass(), DefaultData);
+		}
 	}
 
 	const auto StructName = GetStructName(PsDataClass);
-	if (UPsDataStruct* ExistingStruct = FindObject<UPsDataStruct>(PsDataClass, *StructName))
+	if (FindObject<UPsDataStruct>(PsDataClass->GetPackage(), *StructName))
 	{
 		UE_LOG(LogDataReflection, Fatal, TEXT("Attempting to recreate struct for class %s"), *PsDataClass->GetName());
 	}
 
-	UPsDataStruct* NewStruct = NewObject<UPsDataStruct>(PsDataClass, *StructName, RF_Public | RF_Standalone);
+	UPsDataStruct* NewStruct = NewObject<UPsDataStruct>(PsDataClass->GetPackage(), *StructName, RF_Public | RF_Standalone);
 #if WITH_EDITORONLY_DATA
 	NewStruct->SetMetaData(TEXT("BlueprintType"), TEXT("true"));
 #endif

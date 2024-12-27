@@ -16,12 +16,15 @@
 #include "PsDataTraits.h"
 #include "PsDataUtils.h"
 #include "Types/PsData_Enum.h"
+#include "Types/PsData_FIntVector.h"
 #include "Types/PsData_FLinearColor.h"
 #include "Types/PsData_FName.h"
 #include "Types/PsData_FPsDataBigInteger.h"
 #include "Types/PsData_FPsDataFixedPoint.h"
+#include "Types/PsData_FRuntimeFloatCurve.h"
 #include "Types/PsData_FString.h"
 #include "Types/PsData_FText.h"
+#include "Types/PsData_FVector.h"
 #include "Types/PsData_TSoftClassPtr.h"
 #include "Types/PsData_TSoftObjectPtr.h"
 #include "Types/PsData_UPsData.h"
@@ -143,7 +146,9 @@ public:
 	TDProp& operator=(const TDProp&) = delete;
 	TDProp(TDProp&&) = delete;
 	TDProp& operator=(TDProp&&) = delete;
-	virtual ~TDProp() override {}
+	virtual ~TDProp() override
+	{
+	}
 
 	FPsDataBind Bind(const FPsDataDelegate& Delegate, EDataBindFlags Flags = EDataBindFlags::Default) const
 	{
@@ -178,6 +183,11 @@ public:
 	TReturnType<true> Get() const
 	{
 		return this->GetValue();
+	}
+
+	auto GetEventStorage(UPsDataEvent* Event) const
+	{
+		return this->GetEventStorageValue(Event);
 	}
 
 	void operator=(TValueType<false> InValue)
@@ -506,7 +516,9 @@ public:
 	TDPropProxy& operator=(const TDPropProxy&) = delete;
 	TDPropProxy(TDPropProxy&&) = delete;
 	TDPropProxy& operator=(TDPropProxy&&) = delete;
-	virtual ~TDPropProxy() override {}
+	virtual ~TDPropProxy() override
+	{
+	}
 
 	FPsDataBind Bind(const FPsDataDelegate& Delegate, EDataBindFlags Flags = EDataBindFlags::Default) const
 	{
@@ -541,6 +553,11 @@ public:
 	TReturnType<true> Get() const
 	{
 		return Proxy;
+	}
+
+	auto GetEventStorage(UPsDataEvent* Event) const
+	{
+		return this->GetEventStorageValue(Event);
 	}
 
 	void operator=(TValueType<false> InValue)
@@ -588,10 +605,22 @@ public:
 		return Proxy;
 	}
 
-	auto begin() { return Proxy.begin(); }
-	auto end() { return Proxy.end(); }
-	auto begin() const { return Proxy.begin(); }
-	auto end() const { return Proxy.end(); }
+	auto begin()
+	{
+		return Proxy.begin();
+	}
+	auto end()
+	{
+		return Proxy.end();
+	}
+	auto begin() const
+	{
+		return Proxy.begin();
+	}
+	auto end() const
+	{
+		return Proxy.end();
+	}
 
 private:
 	TReturnType<false> Proxy;

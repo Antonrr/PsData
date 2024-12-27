@@ -178,7 +178,7 @@ struct PSDATA_API FPsDataFriend
 	static void ChangeDataName(UPsData* Data, const FString& Name, const FString& CollectionName);
 	static void AddChild(UPsData* Parent, UPsData* Data);
 	static void RemoveChild(UPsData* Parent, UPsData* Data);
-	static void Changed(UPsData* Data, const FDataField* Field);
+	static void Changed(UPsData* Data, const FDataField* Field, TSharedPtr<FAbstractDataPropertyEventStorage> EventStorage);
 	static void InitProperties(UPsData* Data);
 	static bool ShouldBeGenerateStruct(UPsData* Data);
 	static void InitStructProperties(UPsData* Data);
@@ -310,7 +310,7 @@ private:
 	void ChangeName(const FString& Name, const FString& CollectionName);
 
 	/** Changed */
-	void Changed(const FDataField* Field);
+	void Changed(const FDataField* Field, TSharedPtr<FAbstractDataPropertyEventStorage> EventStorage);
 
 	/** Add to root data */
 	void AddToRootData();
@@ -447,6 +447,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PsData|Data")
 	const FString& GetCollectionKey() const;
 
+	/** Get parent field */
+	const FDataField* GetParentField() const;
+
 	/** Get data path from data */
 	void GetPathFromData(const UPsData* Data, FString& OutPath) const;
 
@@ -472,6 +475,10 @@ public:
 	/** Get data hash. For example, the method can be used with the transaction system */
 	UFUNCTION(BlueprintCallable, Category = "PsData|Data")
 	FString GetHash() const;
+
+	/** Get data hash as int32. For example, the method can be used with the transaction system */
+	UFUNCTION(BlueprintCallable, Category = "PsData|Data")
+	int32 GetHashInt32() const;
 
 	/** Data contains in collection */
 	UFUNCTION(BlueprintCallable, Category = "PsData|Data")

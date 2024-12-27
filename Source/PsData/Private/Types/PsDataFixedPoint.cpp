@@ -2,6 +2,8 @@
 
 #include "Types/PsDataFixedPoint.h"
 
+#include "PsDataDefines.h"
+
 // We use the number 10^n because it is serialization safe and human readable
 const PsDataFixedPointBaseType FPsDataFixedPoint::Exp = PsDataTools::Numbers::Pow10<PsDataFixedPointBaseType>(FIXED_POINT_PRECISION);
 
@@ -29,12 +31,12 @@ FPsDataFixedPoint::FPsDataFixedPoint(int64 Value)
 }
 
 FPsDataFixedPoint::FPsDataFixedPoint(float Value)
-	: Base(static_cast<PsDataFixedPointBaseType>(static_cast<double>(Value) * static_cast<double>(Exp)))
+	: Base(static_cast<PsDataFixedPointBaseType>(static_cast<double>(Value) * static_cast<double>(Exp) + FMath::Sign<double>(Value) * 0.5))
 {
 }
 
 FPsDataFixedPoint::FPsDataFixedPoint(double Value)
-	: Base(static_cast<PsDataFixedPointBaseType>(Value * static_cast<double>(Exp)))
+	: Base(static_cast<PsDataFixedPointBaseType>(Value * static_cast<double>(Exp) + FMath::Sign<double>(Value) * 0.5))
 {
 }
 
@@ -269,7 +271,15 @@ bool FPsDataFixedPoint::ExportTextItem(FString& ValueStr, FPsDataFixedPoint cons
 
 bool FPsDataFixedPoint::ImportTextItem(const TCHAR*& Buffer, int32 PortFlags, UObject* Parent, FOutputDevice* ErrorText)
 {
-	const auto BufferView = PsDataTools::ToStringView(Buffer);
+	FString NewBuffer;
+	Buffer = FPropertyHelpers::ReadToken(Buffer, NewBuffer, true);
+	if (NewBuffer == "-")
+	{
+		Buffer++;
+		Buffer = FPropertyHelpers::ReadToken(Buffer, NewBuffer, true);
+	}
+
+	const auto BufferView = PsDataTools::ToStringView(NewBuffer);
 	if (BufferView.Len() == 0)
 	{
 		Set(Zero);
@@ -298,6 +308,13 @@ bool FPsDataFixedPoint::Serialize(FStructuredArchive::FSlot Slot)
 	return true;
 }
 
+bool FPsDataFixedPoint::NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess)
+{
+	Ar << *this;
+	bOutSuccess = true;
+	return true;
+}
+
 FArchive& operator<<(FArchive& Ar, FPsDataFixedPoint& Value)
 {
 	return Ar << Value.Base;
@@ -308,17 +325,4 @@ void operator<<(FStructuredArchive::FSlot Slot, FPsDataFixedPoint& Value)
 	Slot << Value.Base;
 }
 
-template <>
-struct TStructOpsTypeTraits<FPsDataFixedPoint> : public TStructOpsTypeTraitsBase2<FPsDataFixedPoint>
-{
-	enum
-	{
-		WithIdenticalViaEquality = true,
-		WithExportTextItem = true,
-		WithImportTextItem = true,
-		WithZeroConstructor = true,
-		WithSerializer = true,
-		WithStructuredSerializer = true,
-	};
-};
-IMPLEMENT_STRUCT(PsDataFixedPoint);
+UE_IMPLEMENT_STRUCT("/Script/PsData", PsDataFixedPoint);

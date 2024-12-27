@@ -10,23 +10,16 @@
 #include "Serialize/PsDataSerialization.h"
 
 #include "CoreMinimal.h"
+#include "UObject/GCObject.h"
 
 namespace PsDataTools
 {
 
 template <typename T>
-UClass* GetPsDataClass()
-{
-	const auto Name = FType<T>::Type();
-	const auto Class = FindObject<UClass>(ANY_PACKAGE, &Name[1]);
-	return Class;
-}
-
-template <typename T>
 UPsData* CastToPsData(T* Value)
 {
 #if !UE_BUILD_SHIPPING
-	const auto Class = GetPsDataClass<T>();
+	const auto Class = FindUClass<T>();
 	check(Class && Class->IsChildOf(UPsData::StaticClass()));
 #endif // UE_BUILD_SHIPPING
 
@@ -305,6 +298,224 @@ struct TTypeDeserializer<TMap<FString, T>>
 };
 
 /***********************************
+ * Event Storage
+ ***********************************/
+
+template <typename T>
+struct TDataPropertyEventStorage : public FAbstractDataPropertyEventStorage
+{
+	using Type = T;
+
+private:
+	Type PreviousValue;
+	Type Value;
+
+	static TSharedPtr<FAbstractDataPropertyEventStorage> MakeEventStorage(const FDataField* Field, const T& OldValue, const T& NewValue)
+	{
+		if (!Field->Meta.bEventStorage)
+		{
+			return nullptr;
+		}
+
+		const auto Storage = new TDataPropertyEventStorage<T>();
+		Storage->Field = Field;
+		Storage->PreviousValue = OldValue;
+		Storage->Value = NewValue;
+		return TSharedPtr<FAbstractDataPropertyEventStorage>(Storage);
+	}
+
+	template <typename K>
+	friend struct TDataProperty;
+
+public:
+	const Type& GetPreviousValue() const
+	{
+		return PreviousValue;
+	}
+
+	const Type& GetValue() const
+	{
+		return Value;
+	}
+};
+
+template <typename T>
+struct TDataPropertyEventStorage<T*> : public FAbstractDataPropertyEventStorage, public FGCObject
+{
+	using Type = typename TConstValue<T*, true>::Type;
+
+private:
+	using ObjectPtrType = TObjectPtr<UObject>;
+
+	ObjectPtrType PreviousValue;
+	ObjectPtrType Value;
+
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+	{
+		Collector.AddReferencedObject(PreviousValue);
+		Collector.AddReferencedObject(Value);
+	}
+
+	static TSharedPtr<FAbstractDataPropertyEventStorage> MakeEventStorage(const FDataField* Field, T* OldValue, T* NewValue)
+	{
+		if (!Field->Meta.bEventStorage)
+		{
+			return nullptr;
+		}
+
+		const auto Storage = new TDataPropertyEventStorage<T*>();
+		Storage->Field = Field;
+		Storage->PreviousValue = reinterpret_cast<UObject*>(OldValue);
+		Storage->Value = reinterpret_cast<UObject*>(NewValue);
+		return TSharedPtr<FAbstractDataPropertyEventStorage>(Storage);
+	}
+
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("TDataPropertyEventStorage");
+	}
+
+	template <typename K>
+	friend struct TDataProperty;
+
+public:
+	Type GetPreviousValue() const
+	{
+		return reinterpret_cast<Type>(ObjectPtrDecay(PreviousValue));
+	}
+
+	Type GetValue() const
+	{
+		return reinterpret_cast<Type>(ObjectPtrDecay(Value));
+	}
+};
+
+template <typename T>
+struct TDataPropertyEventStorage<TArray<T*>> : public FAbstractDataPropertyEventStorage, public FGCObject
+{
+	using Type = typename TConstValue<T*, true>::Type;
+	using ArrayType = TArray<Type>;
+
+private:
+	using ObjectPtrArrayType = TArray<TObjectPtr<UObject>>;
+
+	ObjectPtrArrayType PreviousValue;
+	ObjectPtrArrayType Value;
+
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+	{
+		Collector.AddReferencedObjects(PreviousValue);
+		Collector.AddReferencedObjects(Value);
+	}
+
+	static ObjectPtrArrayType Wrap(const TArray<T*>& Items)
+	{
+		ObjectPtrArrayType Result;
+		for (auto Item : Items)
+		{
+			Result.Add(reinterpret_cast<UObject*>(Item));
+		}
+
+		return Result;
+	}
+
+	static TSharedPtr<FAbstractDataPropertyEventStorage> MakeEventStorage(const FDataField* Field, const TArray<T*>& OldValue, const TArray<T*>& NewValue)
+	{
+		if (!Field->Meta.bEventStorage)
+		{
+			return nullptr;
+		}
+
+		const auto Storage = new TDataPropertyEventStorage<TArray<T*>>();
+		Storage->Field = Field;
+		Storage->PreviousValue = Wrap(OldValue);
+		Storage->Value = Wrap(NewValue);
+		return TSharedPtr<FAbstractDataPropertyEventStorage>(Storage);
+	}
+
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("TDataPropertyEventStorage");
+	}
+
+	template <typename K>
+	friend struct TDataProperty;
+
+public:
+	const ArrayType& GetPreviousValue() const
+	{
+		return *reinterpret_cast<ArrayType*>(&ObjectPtrDecay(PreviousValue));
+	}
+
+	const ArrayType& GetValue() const
+	{
+		return *reinterpret_cast<ArrayType*>(&ObjectPtrDecay(Value));
+	}
+};
+
+template <typename T>
+struct TDataPropertyEventStorage<TMap<FString, T*>> : public FAbstractDataPropertyEventStorage, public FGCObject
+{
+	using Type = typename TConstValue<T*, true>::Type;
+	using MapType = TMap<FString, Type>;
+
+private:
+	using ObjectPtrMapType = TMap<FString, TObjectPtr<UObject>>;
+
+	ObjectPtrMapType PreviousValue;
+	ObjectPtrMapType Value;
+
+	virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+	{
+		Collector.AddReferencedObjects(PreviousValue);
+		Collector.AddReferencedObjects(Value);
+	}
+
+	static ObjectPtrMapType Wrap(const TMap<FString, T*>& Items)
+	{
+		ObjectPtrMapType Result;
+		for (auto Pair : Items)
+		{
+			Result.Add(Pair.Key, reinterpret_cast<UObject*>(Pair.Value));
+		}
+		return Result;
+	}
+
+	static TSharedPtr<FAbstractDataPropertyEventStorage> MakeEventStorage(const FDataField* Field, const TMap<FString, T*>& OldValue, const TMap<FString, T*>& NewValue)
+	{
+		if (!Field->Meta.bEventStorage)
+		{
+			return nullptr;
+		}
+
+		const auto Storage = new TDataPropertyEventStorage<TMap<FString, T*>>();
+		Storage->Field = Field;
+		Storage->PreviousValue = Wrap(OldValue);
+		Storage->Value = Wrap(NewValue);
+		return TSharedPtr<FAbstractDataPropertyEventStorage>(Storage);
+	}
+
+	virtual FString GetReferencerName() const override
+	{
+		return TEXT("TDataPropertyEventStorage");
+	}
+
+	template <typename K>
+	friend struct TDataProperty;
+
+public:
+	const MapType& GetPreviousValue() const
+	{
+		return *reinterpret_cast<MapType*>(&ObjectPtrDecay(PreviousValue));
+	}
+
+	const MapType& GetValue() const
+	{
+		return *reinterpret_cast<MapType*>(&ObjectPtrDecay(Value));
+	}
+};
+
+/***********************************
  * Property
  ***********************************/
 
@@ -359,9 +570,19 @@ struct TDataProperty : public FAbstractDataProperty
 			return;
 		}
 
+		const auto Storage = TDataPropertyEventStorage<T>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 
-		FPsDataFriend::Changed(GetOwner(), GetField());
+		FPsDataFriend::Changed(GetOwner(), GetField(), Storage);
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<T> const*>(Storage.Get());
 	}
 };
 
@@ -419,9 +640,19 @@ struct TDataProperty<TArray<T>> : public FAbstractDataProperty
 			return;
 		}
 
+		const auto Storage = TDataPropertyEventStorage<TArray<T>>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 
-		FPsDataFriend::Changed(GetOwner(), GetField());
+		FPsDataFriend::Changed(GetOwner(), GetField(), Storage);
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<TArray<T>> const*>(Storage.Get());
 	}
 };
 
@@ -493,10 +724,12 @@ struct TDataProperty<TMap<FString, T>> : public FAbstractDataProperty
 		}
 #endif
 
+		const auto Storage = TDataPropertyEventStorage<TMap<FString, T>>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 		bSorted = false;
 
-		FPsDataFriend::Changed(GetOwner(), GetField());
+		FPsDataFriend::Changed(GetOwner(), GetField(), Storage);
 	}
 
 	void Sort() const
@@ -508,6 +741,14 @@ struct TDataProperty<TMap<FString, T>> : public FAbstractDataProperty
 				return A < B;
 			});
 		}
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<TMap<FString, T>> const*>(Storage.Get());
 	}
 };
 
@@ -590,6 +831,8 @@ struct TDataProperty<T*> : public FAbstractDataProperty
 			FPsDataFriend::RemoveChild(GetOwner(), CastToPsData(Value));
 		}
 
+		const auto Storage = TDataPropertyEventStorage<T*>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 
 		if (NewValue)
@@ -598,7 +841,15 @@ struct TDataProperty<T*> : public FAbstractDataProperty
 			FPsDataFriend::AddChild(GetOwner(), CastToPsData(NewValue));
 		}
 
-		FPsDataFriend::Changed(GetOwner(), Field);
+		FPsDataFriend::Changed(GetOwner(), Field, Storage);
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<T*> const*>(Storage.Get());
 	}
 };
 
@@ -680,9 +931,19 @@ struct TDataProperty<TArray<T*>> : public FAbstractDataProperty
 			return;
 		}
 
+		const auto Storage = TDataPropertyEventStorage<TArray<T*>>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 
-		FPsDataFriend::Changed(GetOwner(), Field);
+		FPsDataFriend::Changed(GetOwner(), Field, Storage);
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<TArray<T*>> const*>(Storage.Get());
 	}
 };
 
@@ -778,10 +1039,12 @@ struct TDataProperty<TMap<FString, T*>> : public FAbstractDataProperty
 			return;
 		}
 
+		const auto Storage = TDataPropertyEventStorage<TMap<FString, T*>>::MakeEventStorage(GetField(), Value, NewValue);
+
 		Value = NewValue;
 		bSorted = false;
 
-		FPsDataFriend::Changed(GetOwner(), Field);
+		FPsDataFriend::Changed(GetOwner(), Field, Storage);
 	}
 
 	void Sort() const
@@ -793,6 +1056,14 @@ struct TDataProperty<TMap<FString, T*>> : public FAbstractDataProperty
 				return A < B;
 			});
 		}
+	}
+
+	auto GetEventStorageValue(const UPsDataEvent* Event) const
+	{
+		const auto Storage = Event->GetStorage();
+		check(Storage && Storage->GetField() == GetField());
+
+		return static_cast<TDataPropertyEventStorage<TMap<FString, T*>> const*>(Storage.Get());
 	}
 };
 

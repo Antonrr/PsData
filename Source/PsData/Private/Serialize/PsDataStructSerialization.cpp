@@ -4,6 +4,7 @@
 
 #include "PsData.h"
 #include "PsDataCore.h"
+#include "Types/PsData_FRuntimeFloatCurve.h"
 
 #include "Internationalization/Regex.h"
 #include "JsonObjectConverter.h"
@@ -99,6 +100,15 @@ uint8* FPsDataStructSerializer::CreateStructFromJson_Import(const UStruct* Struc
 	return CreateStructFromJson(Struct, JsonObject, true);
 }
 
+bool FPsDataStructSerializer::IsStructAsText(const UStruct* Struct)
+{
+	static const TSet<const UStruct*> Structs = {
+		FRuntimeFloatCurve::StaticStruct(),
+		PsDataTools::FindUScriptStruct<FVector>(),
+		PsDataTools::FindUScriptStruct<FLinearColor>()};
+	return Structs.Contains(Struct);
+}
+
 void FPsDataStructSerializer::PropertyDeserialize(FProperty* Property, uint8* OutDest, const TSharedRef<FJsonValue>& JsonValue)
 {
 	if (const auto TextProperty = CastField<FTextProperty>(Property))
@@ -141,7 +151,7 @@ void FPsDataStructSerializer::PropertyDeserialize(FProperty* Property, uint8* Ou
 			return;
 		}
 
-		UE_LOG(LogData, Warning, TEXT("Can't deserialize \"%s\" as \"%s\""), *Property->GetAuthoredName(), *StructProperty->GetCPPType(nullptr, 0));
+		// UE_LOG(LogData, Warning, TEXT("Can't deserialize \"%s\" as \"%s\""), *Property->GetAuthoredName(), *StructProperty->GetCPPType(nullptr, 0));
 	}
 
 	FJsonObjectConverter::JsonValueToUProperty(JsonValue, Property, OutDest, 0, 0);
@@ -353,6 +363,13 @@ TSharedPtr<FJsonValue> FPsDataStructDeserializer::StructPropertySerialize(FStruc
 {
 	if (StructProperty->Struct)
 	{
+		if (FPsDataStructSerializer::IsStructAsText(StructProperty->Struct))
+		{
+			FString ResultString;
+			StructProperty->Struct->ExportText(ResultString, Value, nullptr, nullptr, PPF_None, nullptr);
+			return MakeShared<FJsonValueString>(ResultString);
+		}
+
 		const auto CppStructOps = StructProperty->Struct->GetCppStructOps();
 		if (CppStructOps && CppStructOps->HasExportTextItem() && CppStructOps->HasImportTextItem())
 		{

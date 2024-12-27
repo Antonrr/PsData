@@ -9,6 +9,17 @@
 #include "Types/PsData_FString.h"
 #include "Types/PsData_UPsData.h"
 
+static FAutoConsoleCommand CmdPsDataTypeInfo(
+	TEXT("PsData.TypeInfo"),
+	TEXT("Print type information"),
+	FConsoleCommandWithArgsDelegate::CreateLambda([](const TArray<FString>& Args) {
+		if (Args.Num() == 1)
+		{
+			PsDataTools::FDataReflection::PrintTypeInfo(Args[0]);
+		}
+	}),
+	ECVF_Cheat);
+
 namespace PsDataTools
 {
 FClassFields::FClassFields()
@@ -342,7 +353,7 @@ bool FDataReflection::InitProperty(UClass* Class, const char* Name, FAbstractDat
 
 	if (!IsValidKey(OutField->GetAliasName()))
 	{
-		UE_LOG(LogDataReflection, Fatal, TEXT("Illegal alias %s for property %s::%s (%d)"), *Class->GetName(), *PropertyName, Hash);
+		UE_LOG(LogDataReflection, Fatal, TEXT("Illegal alias %s for property %s::%s (%d)"), *OutField->GetAliasName(), *Class->GetName(), *PropertyName, Hash);
 	}
 	if (ClassFields.HasFieldWithAlias(OutField->GetAliasName()))
 	{
@@ -475,6 +486,11 @@ bool FDataReflection::HasClass(const UClass* OwnerClass)
 	return FieldsByClass.Contains(OwnerClass);
 }
 
+bool FDataReflection::IsCompiled()
+{
+	return bCompiled;
+}
+
 void FDataReflection::Compile()
 {
 	check(!bCompiled);
@@ -604,6 +620,201 @@ void FDataReflection::CompileClassInstance(UPsData* Instance, bool bGenerateStru
 	else
 	{
 		FPsDataFriend::InitStructProperties(Instance);
+	}
+}
+
+void FDataReflection::PrintTypeInfo(const FString& Type)
+{
+	if (Type.Len() > 0)
+	{
+		const auto Class = FindUClass(&Type[1]);
+		const auto Fields = GetFieldsByClass(Class);
+		if (Fields)
+		{
+			if (Fields->GetNumFields() > 0)
+			{
+				UE_LOG(LogDataReflection, Display, TEXT("Fields:"));
+
+				for (const auto Field : Fields->GetFieldsList())
+				{
+					UE_LOG(LogDataReflection, Display, TEXT(" %s U%s::%s"), *Field->Context->GetCppType(), *Class->GetName(), *Field->Name);
+				}
+			}
+
+			if (Fields->GetNumLinks() > 0)
+			{
+				UE_LOG(LogDataReflection, Display, TEXT(" "));
+				UE_LOG(LogDataReflection, Display, TEXT("Links:"));
+
+				for (const auto Link : Fields->GetLinksList())
+				{
+					UE_LOG(LogDataReflection, Display, TEXT(" %s U%s::%s"), *Link->ReturnContext->GetCppType(), *Class->GetName(), *Link->Field->Name);
+				}
+			}
+
+			{
+				const auto Chains = GetParentChain(Class, true, false);
+				if (Chains.Num() > 0)
+				{
+					UE_LOG(LogDataReflection, Display, TEXT(" "));
+					UE_LOG(LogDataReflection, Display, TEXT("Field paths:"));
+				}
+
+				TArray<FString> List;
+				List.Reserve(Chains.Num());
+
+				for (const auto& Chain : Chains)
+				{
+					FString Path;
+
+					for (const auto Pair : Chain)
+					{
+						if (Path.Len() > 0)
+						{
+							Path = Pair.Value->Name + TEXT(".") + Path;
+						}
+						else
+						{
+							Path = Pair.Value->Name + Path;
+						}
+					}
+
+					List.Add(FString::Printf(TEXT(" U%s: %s"), *Chain.Last().Key->GetName(), *Path));
+				}
+
+				List.Sort([](const FString& A, const FString& B) {
+					return A < B;
+				});
+
+				for (const auto& Path : List)
+				{
+					UE_LOG(LogDataReflection, Display, TEXT("%s"), *Path);
+				}
+			}
+
+			{
+				const auto Chains = GetParentChain(Class, false, true);
+
+				if (Chains.Num() > 0)
+				{
+					UE_LOG(LogDataReflection, Display, TEXT(" "));
+					UE_LOG(LogDataReflection, Display, TEXT("Link paths:"));
+				}
+
+				TArray<FString> List;
+				List.Reserve(Chains.Num());
+
+				for (const auto& Chain : Chains)
+				{
+					FString Path;
+
+					for (const auto Pair : Chain)
+					{
+						if (Path.Len() > 0)
+						{
+							Path = Pair.Value->Name + TEXT(".") + Path;
+						}
+						else
+						{
+							Path = Pair.Value->Name + Path;
+						}
+					}
+
+					List.Add(FString::Printf(TEXT(" U%s: %s"), *Chain.Last().Key->GetName(), *Path));
+				}
+
+				List.Sort([](const FString& A, const FString& B) {
+					return A < B;
+				});
+
+				for (const auto& Path : List)
+				{
+					UE_LOG(LogDataReflection, Display, TEXT("%s"), *Path);
+				}
+			}
+
+			return;
+		}
+	}
+
+	UE_LOG(LogDataReflection, Display, TEXT("Unknown type: %s"), *Type);
+}
+
+TArray<FDataReflection::FFieldPair> FDataReflection::GetParentFieldForClass(const UClass* Class)
+{
+	TArray<FFieldPair> Result;
+	for (const auto& Pair : FieldsByClass)
+	{
+		for (const auto Field : Pair.Value.GetFieldsList())
+		{
+			if (Field->Context->GetUEType() == Class)
+			{
+				Result.Add(FFieldPair(Pair.Key, Field));
+			}
+		}
+	}
+
+	return Result;
+}
+
+TArray<FDataReflection::FLinkPair> FDataReflection::GetParentLinkForClass(const UClass* Class)
+{
+	TArray<FLinkPair> Result;
+	for (const auto& Pair : FieldsByClass)
+	{
+		for (const auto Link : Pair.Value.GetLinksList())
+		{
+			if (Link->ReturnContext->GetUEType() == Class)
+			{
+				Result.Add(FLinkPair(Pair.Key, Link));
+			}
+		}
+	}
+	return Result;
+}
+
+TArray<TArray<FDataReflection::FFieldPair>> FDataReflection::GetParentChain(const UClass* Class, bool bFields, bool bLinks)
+{
+	TArray<TArray<FFieldPair>> List;
+	if (bFields)
+	{
+		for (auto Pair : GetParentLinkForClass(Class))
+		{
+			List.AddDefaulted_GetRef().Add(FFieldPair(Pair.Key, Pair.Value->Field));
+		}
+	}
+
+	if (bLinks)
+	{
+		for (auto Pair : GetParentLinkForClass(Class))
+		{
+			List.AddDefaulted_GetRef().Add(FFieldPair(Pair.Key, Pair.Value->Field));
+		}
+	}
+
+	GetParentChainInternal(List);
+
+	return List;
+}
+
+void FDataReflection::GetParentChainInternal(TArray<TArray<FFieldPair>>& InOutList)
+{
+	for (int32 i = 0; i < InOutList.Num(); ++i)
+	{
+		auto& Pairs = InOutList[i];
+		const auto ParentFields = GetParentFieldForClass(Pairs.Last().Key);
+		if (ParentFields.Num() > 0)
+		{
+			for (int32 j = 1; j < ParentFields.Num(); ++j)
+			{
+				auto NewPairs = Pairs;
+				NewPairs.Add(ParentFields[j]);
+				InOutList.Add(NewPairs);
+			}
+
+			Pairs.Add(ParentFields[0]);
+			i -= 1;
+		}
 	}
 }
 

@@ -25,6 +25,41 @@ void FPsDataBufferOutputStream::Reserve(int32 NumBytes)
 	Buffer.Reserve(NumBytes);
 }
 
+void FPsDataBufferOutputStream::WriteUint8(uint8 Value)
+{
+	Buffer.Push(Value);
+}
+
+void FPsDataBufferOutputStream::WriteInt8(int8 Value)
+{
+	if (Value < 0)
+	{
+		WriteUint8(static_cast<uint8>(Value * -1) | 0x80);
+	}
+	else
+	{
+		WriteUint8(static_cast<uint8>(Value));
+	}
+}
+
+void FPsDataBufferOutputStream::WriteUint16(uint16 Value)
+{
+	Buffer.Push(static_cast<uint8>(Value >> 8));
+	Buffer.Push(static_cast<uint8>(Value));
+}
+
+void FPsDataBufferOutputStream::WriteInt16(int16 Value)
+{
+	if (Value < 0)
+	{
+		WriteUint16(static_cast<uint16>(Value * -1) | 0x8000);
+	}
+	else
+	{
+		WriteUint16(static_cast<uint16>(Value));
+	}
+}
+
 void FPsDataBufferOutputStream::WriteUint32(uint32 Value)
 {
 	Buffer.Push(static_cast<uint8>(Value >> 24));
@@ -67,11 +102,6 @@ void FPsDataBufferOutputStream::WriteInt64(int64 Value)
 	{
 		WriteUint64(static_cast<uint64>(Value));
 	}
-}
-
-void FPsDataBufferOutputStream::WriteUint8(uint8 Value)
-{
-	Buffer.Push(Value);
 }
 
 void FPsDataBufferOutputStream::WriteFloat(float Value)

@@ -92,25 +92,6 @@ template <typename T, bool bConst = true>
 using TConstRefType = typename TConstRef<T, bConst>::Type;
 
 /***********************************
- * TConstRefR trait
- ***********************************/
-
-template <typename T, bool bConst>
-struct TConstRefR
-{
-	using Type = const T&;
-};
-
-template <typename T, bool bConst>
-struct TConstRefR<T*, bConst>
-{
-	using Type = typename TSelector<T const* const&, T* const&, bConst>::Value;
-};
-
-template <typename T, bool bConst = true>
-using TConstRefRType = typename TConstRefR<T, bConst>::Type;
-
-/***********************************
  * Integer equivalent trait
  ***********************************/
 

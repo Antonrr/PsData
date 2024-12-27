@@ -81,6 +81,22 @@ UPsDataEvent* UPsDataEvent::ConstructEvent(FString EventType, bool bEventBubbles
 	return Event;
 }
 
+UPsDataEvent* UPsDataEvent::ConstructEventWithStorage(FString EventType, bool bEventBubbles, TSharedPtr<FAbstractDataPropertyEventStorage> Storage, UClass* EventClass)
+{
+	if (!EventClass)
+	{
+		EventClass = UPsDataEvent::StaticClass();
+	}
+
+	UPsDataEvent* Event = NewObject<UPsDataEvent>(GetTransientPackage(), EventClass);
+
+	Event->Type = EventType;
+	Event->bBubbles = bEventBubbles;
+	Event->Storage = Storage;
+
+	return Event;
+}
+
 const UPsData* UPsDataEvent::GetTarget() const
 {
 	return Target;
@@ -120,6 +136,11 @@ bool UPsDataEvent::IsStopped() const
 bool UPsDataEvent::IsStoppedImmediately() const
 {
 	return StopType >= EPsDataEventStopType::StopImmediate || (ParentEvent && ParentEvent->IsStoppedImmediately());
+}
+
+TSharedPtr<FAbstractDataPropertyEventStorage> UPsDataEvent::GetStorage() const
+{
+	return Storage;
 }
 
 DEFINE_FUNCTION(UPsDataEventFunctionLibrary::execGetEventTarget)

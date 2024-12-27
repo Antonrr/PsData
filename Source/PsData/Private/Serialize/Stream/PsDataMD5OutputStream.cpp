@@ -32,14 +32,14 @@ FString FPsDataMD5Hash::ToString() const
 	return FString::Printf(TEXT("%016llx%016llx"), A, B);
 }
 
-uint32 FPsDataMD5Hash::ToUint32() const
+int32 FPsDataMD5Hash::ToInt32() const
 {
-	return static_cast<uint32>(A);
+	return static_cast<int32>(A);
 }
 
-uint64 FPsDataMD5Hash::ToUint64() const
+int64 FPsDataMD5Hash::ToInt64() const
 {
-	return A;
+	return static_cast<int64>(A);
 }
 
 void FPsDataMD5Hash::GetDigest(uint64& OutA, uint64& OutB) const
@@ -59,6 +59,34 @@ FPsDataMD5OutputStream::FPsDataMD5OutputStream()
 FPsDataMD5Hash FPsDataMD5OutputStream::GetHash()
 {
 	return {Md5Gen};
+}
+
+void FPsDataMD5OutputStream::WriteUint8(uint8 Value)
+{
+	OutputSteram.WriteUint8(Value);
+	Write(Md5Gen, OutputSteram.GetBuffer());
+	OutputSteram.Reset();
+}
+
+void FPsDataMD5OutputStream::WriteInt8(int8 Value)
+{
+	OutputSteram.WriteInt8(Value);
+	Write(Md5Gen, OutputSteram.GetBuffer());
+	OutputSteram.Reset();
+}
+
+void FPsDataMD5OutputStream::WriteUint16(uint16 Value)
+{
+	OutputSteram.WriteUint16(Value);
+	Write(Md5Gen, OutputSteram.GetBuffer());
+	OutputSteram.Reset();
+}
+
+void FPsDataMD5OutputStream::WriteInt16(int16 Value)
+{
+	OutputSteram.WriteInt16(Value);
+	Write(Md5Gen, OutputSteram.GetBuffer());
+	OutputSteram.Reset();
 }
 
 void FPsDataMD5OutputStream::WriteUint32(uint32 Value)
@@ -85,13 +113,6 @@ void FPsDataMD5OutputStream::WriteUint64(uint64 Value)
 void FPsDataMD5OutputStream::WriteInt64(int64 Value)
 {
 	OutputSteram.WriteInt64(Value);
-	Write(Md5Gen, OutputSteram.GetBuffer());
-	OutputSteram.Reset();
-}
-
-void FPsDataMD5OutputStream::WriteUint8(uint8 Value)
-{
-	OutputSteram.WriteUint8(Value);
 	Write(Md5Gen, OutputSteram.GetBuffer());
 	OutputSteram.Reset();
 }

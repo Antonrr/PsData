@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "PsDataField.h"
 
 #include "PsDataEvent.generated.h"
 
@@ -25,6 +26,17 @@ public:
 private:
 	static int32 Index;
 	static TArray<FPsDataEventScopeGuardCallback> Callbacks;
+};
+
+struct FAbstractDataPropertyEventStorage
+{
+	const FDataField* GetField() const
+	{
+		return Field;
+	}
+
+protected:
+	const FDataField* Field = nullptr;
 };
 
 class UPsData;
@@ -76,6 +88,14 @@ public:
 		return CastChecked<EventClass>(ConstructEvent(EventType, bEventBubbles, EventClass::StaticClass()));
 	}
 
+	static UPsDataEvent* ConstructEventWithStorage(FString EventType, bool bEventBubbles, TSharedPtr<FAbstractDataPropertyEventStorage> Storage, UClass* EventClass = nullptr);
+
+	template <class EventClass>
+	static EventClass* ConstructEventWithStorage(FString EventType, bool bEventBubbles, TSharedPtr<FAbstractDataPropertyEventStorage> Storage)
+	{
+		return CastChecked<EventClass>(ConstructEventWithStorage(EventType, bEventBubbles, Storage, EventClass::StaticClass()));
+	}
+
 private:
 	friend class UPsData;
 	friend class UPsDataEventFunctionLibrary;
@@ -96,6 +116,8 @@ protected:
 
 	UPROPERTY()
 	EPsDataEventStopType StopType;
+
+	TSharedPtr<FAbstractDataPropertyEventStorage> Storage;
 
 public:
 	/* Const target for c++ */
@@ -118,6 +140,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PsData|Event")
 	bool IsStoppedImmediately() const;
+
+	TSharedPtr<FAbstractDataPropertyEventStorage> GetStorage() const;
 };
 
 UCLASS(meta = (CustomThunkTemplates = "FCustomThunkTemplates_PsDataEvent"))

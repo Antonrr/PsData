@@ -6,6 +6,7 @@
 
 #include "EdGraphSchema_K2.h"
 #include "EdGraphUtilities.h"
+#include "Engine/BlueprintGeneratedClass.h"
 #include "KismetCompiler.h"
 
 #define LOCTEXT_NAMESPACE "FPsDataHandler_CallFunction"

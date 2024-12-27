@@ -22,7 +22,7 @@ void WriteBigIntegerToProperty(TSharedPtr<IPropertyHandle> BigIntegerPropertyHan
 		auto Data = static_cast<FPsDataBigInteger*>(RawData);
 		*Data = Value;
 	}
-	BigIntegerPropertyHandle->NotifyPostChange();
+	BigIntegerPropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 }
 
 TSharedRef<IPropertyTypeCustomization> FPsDataBigIntegerStructCustomization::MakeInstance()
@@ -75,11 +75,13 @@ FSlateColor FPsDataBigIntegerStructCustomization::HandleTextBoxForegroundColor()
 {
 	if (bInputValid)
 	{
-		static const FName InvertedForegroundName("InvertedForeground");
-		return FEditorStyle::GetSlateColor(InvertedForegroundName);
+		static const FName DefaultForeground("Colors.Foreground");
+		return FAppStyle::Get().GetSlateColor(DefaultForeground);
 	}
 
-	return FLinearColor::Red;
+	static const FName Red("Colors.AccentRed");
+
+	return FAppStyle::Get().GetSlateColor(Red);
 }
 
 FText FPsDataBigIntegerStructCustomization::HandleTextBoxText() const

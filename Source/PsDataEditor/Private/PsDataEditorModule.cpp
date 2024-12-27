@@ -40,14 +40,6 @@ void FPsDataEditorModule::ShutdownModule()
 
 void FPsDataEditorModule::RegisterAssetTypeActions()
 {
-	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
-	const auto AssetTypeActionsForDataTable = AssetTools.GetAssetTypeActionsForClass(UDataTable::StaticClass());
-	if (AssetTypeActionsForDataTable.IsValid())
-	{
-		AssetTools.UnregisterAssetTypeActions(AssetTypeActionsForDataTable.Pin().ToSharedRef());
-	}
-
-	AssetTools.RegisterAssetTypeActions(MakeShared<FPsDataAssetTypeActions_DataTable>());
 }
 
 #undef LOCTEXT_NAMESPACE

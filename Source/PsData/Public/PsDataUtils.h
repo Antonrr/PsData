@@ -7,6 +7,8 @@
 #include "CoreMinimal.h"
 
 #include "PsDataTraits.h"
+#include "UObject/Class.h"
+#include "UObject/Package.h"
 #include "math.h"
 
 #include <cmath>
@@ -16,6 +18,45 @@ DEFINE_LOG_CATEGORY_STATIC(LogDataUtils, VeryVerbose, All);
 
 namespace PsDataTools
 {
+
+inline UEnum* FindUEnum(const TCHAR* Name)
+{
+	const auto Enum = FindFirstObjectSafe<UEnum>(Name);
+	return Enum;
+}
+
+inline UClass* FindUClass(const TCHAR* Name)
+{
+	const auto Class = FindFirstObjectSafe<UClass>(Name);
+	return Class;
+}
+
+inline UScriptStruct* FindUScriptStruct(const TCHAR* Name)
+{
+	const auto Struct = FindFirstObjectSafe<UScriptStruct>(Name);
+	return Struct;
+}
+
+template <typename T>
+UEnum* FindUEnum()
+{
+	static const auto Enum = FindFirstObjectSafe<UEnum>(*FType<T>::Type());
+	return Enum;
+}
+
+template <typename T>
+UClass* FindUClass()
+{
+	static const auto Class = FindFirstObjectSafe<UClass>(&((*FType<T>::ContentType())[1]));
+	return Class;
+}
+
+template <typename T>
+UScriptStruct* FindUScriptStruct()
+{
+	static const auto Struct = FindFirstObjectSafe<UScriptStruct>(&((*FType<T>::ContentType())[1]));
+	return Struct;
+}
 
 template <typename T>
 constexpr bool IsValidCharForKey(T Char)
@@ -401,8 +442,15 @@ GetUndefinedFloatingPoint()
 }
 
 template <typename K, typename T>
-TOptional<K> ToNumber(const TDataStringView<T>& StringNumber)
+TOptional<K> ToNumber(TDataStringView<T> StringNumber)
 {
+	K Sign = 1;
+	if (StringNumber.Len() > 0 && StringNumber[0] == '-')
+	{
+		Sign = -1;
+		StringNumber = StringNumber.RightChop(1);
+	}
+
 	const auto DotPos = StringNumber.FindByPredicate([](T Char) { return IsDot(Char); });
 	const auto ExpPos = StringNumber.FindByPredicate([](T Char) { return IsExp(Char); });
 
@@ -415,17 +463,20 @@ TOptional<K> ToNumber(const TDataStringView<T>& StringNumber)
 				return GetUndefinedFloatingPoint<K>();
 			}
 
-			return ToInteger<K>(StringNumber);
+			if (const auto A = ToUnsignedInteger<K>(StringNumber))
+			{
+				return Sign * A.GetValue();
+			}
 		}
 		else
 		{
 			const auto AStr = StringNumber.Left(ExpPos);
-			if (const auto A = ToInteger<K>(AStr))
+			if (const auto A = ToUnsignedInteger<K>(AStr))
 			{
 				const auto CStr = StringNumber.RightChop(ExpPos + 1);
 				if (const auto C = ToInteger<int32>(CStr))
 				{
-					return Pow10x<K>(A.GetValue(), C.GetValue());
+					return Sign * Pow10x<K>(A.GetValue(), C.GetValue());
 				}
 			}
 		}
@@ -435,26 +486,19 @@ TOptional<K> ToNumber(const TDataStringView<T>& StringNumber)
 		if (ExpPos == INDEX_NONE)
 		{
 			const auto AStr = StringNumber.Left(DotPos);
-			if (const auto A = ToInteger<K>(AStr))
+			if (const auto A = ToUnsignedInteger<K>(AStr))
 			{
 				const auto BStr = StringNumber.RightChop(DotPos + 1);
 				if (const auto B = ToUnsignedInteger<K>(BStr))
 				{
-					if (A.GetValue() < 0)
-					{
-						return A.GetValue() - Pow10x<K>(B.GetValue(), -BStr.Len());
-					}
-					else
-					{
-						return A.GetValue() + Pow10x<K>(B.GetValue(), -BStr.Len());
-					}
+					return Sign * (A.GetValue() + Pow10x<K>(B.GetValue(), -BStr.Len()));
 				}
 			}
 		}
 		else
 		{
 			const auto AStr = StringNumber.Left(DotPos);
-			if (const auto A = ToInteger<K>(AStr))
+			if (const auto A = ToUnsignedInteger<K>(AStr))
 			{
 				const auto BStr = StringNumber.RightChop(DotPos + 1).Left(ExpPos - DotPos - 1);
 				if (const auto B = ToUnsignedInteger<K>(BStr))
@@ -462,14 +506,7 @@ TOptional<K> ToNumber(const TDataStringView<T>& StringNumber)
 					const auto CStr = StringNumber.RightChop(ExpPos + 1);
 					if (const auto C = ToInteger<int32>(CStr))
 					{
-						if (A.GetValue() < 0)
-						{
-							return Pow10x<K>(A.GetValue(), C.GetValue()) - Pow10x<K>(B.GetValue(), C.GetValue() - BStr.Len());
-						}
-						else
-						{
-							return Pow10x<K>(A.GetValue(), C.GetValue()) + Pow10x<K>(B.GetValue(), C.GetValue() - BStr.Len());
-						}
+						return Sign * (Pow10x<K>(A.GetValue(), C.GetValue()) + Pow10x<K>(B.GetValue(), C.GetValue() - BStr.Len()));
 					}
 				}
 			}

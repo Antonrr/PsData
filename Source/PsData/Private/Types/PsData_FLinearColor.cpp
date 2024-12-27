@@ -102,66 +102,33 @@ DEFINE_FUNCTION(UPsDataFLinearColorLibrary::execGetArrayLinkValue)
 	P_NATIVE_END;
 }
 
+UScriptStruct* GetStruct()
+{
+	return PsDataTools::FindUScriptStruct<FLinearColor>();
+}
+
 void UPsDataFLinearColorLibrary::TypeSerialize(const UPsData* const Instance, const FDataField* Field, FPsDataSerializer* Serializer, const FLinearColor& Value)
 {
-	static const FString RParam(TEXT("r"));
-	static const FString GParam(TEXT("g"));
-	static const FString BParam(TEXT("b"));
-	static const FString AParam(TEXT("a"));
-
-	Serializer->WriteObject();
-	Serializer->WriteKey(RParam);
-	Serializer->WriteValue(Value.R);
-	Serializer->PopKey(RParam);
-	Serializer->WriteKey(GParam);
-	Serializer->WriteValue(Value.G);
-	Serializer->PopKey(GParam);
-	Serializer->WriteKey(BParam);
-	Serializer->WriteValue(Value.B);
-	Serializer->PopKey(BParam);
-	Serializer->WriteKey(AParam);
-	Serializer->WriteValue(Value.A);
-	Serializer->PopKey(AParam);
-	Serializer->PopObject();
+	FString ResultString;
+	const auto Struct = PsDataTools::FindUScriptStruct<FLinearColor>();
+	Struct->ExportText(ResultString, &Value, nullptr, nullptr, PPF_None, nullptr);
+	Serializer->WriteValue(ResultString);
 }
 
 FLinearColor UPsDataFLinearColorLibrary::TypeDeserialize(const UPsData* const Instance, const FDataField* Field, FPsDataDeserializer* Deserializer, const FLinearColor& Value)
 {
-	static const FString RParam(TEXT("r"));
-	static const FString GParam(TEXT("g"));
-	static const FString BParam(TEXT("b"));
-	static const FString AParam(TEXT("a"));
-
 	FLinearColor Result;
-	if (Deserializer->ReadObject())
+
+	FString StringValue;
+	if (Deserializer->ReadValue(StringValue))
 	{
-		FString Key;
-		while (Deserializer->ReadKey(Key))
-		{
-			float Channel = 0;
-			if (Key == RParam && Deserializer->ReadValue(Channel))
-			{
-				Result.R = Channel;
-			}
-			else if (Key == GParam && Deserializer->ReadValue(Channel))
-			{
-				Result.G = Channel;
-			}
-			else if (Key == BParam && Deserializer->ReadValue(Channel))
-			{
-				Result.B = Channel;
-			}
-			else if (Key == AParam && Deserializer->ReadValue(Channel))
-			{
-				Result.A = Channel;
-			}
-			Deserializer->PopKey(Key);
-		}
-		Deserializer->PopObject();
+		const auto Struct = PsDataTools::FindUScriptStruct<FLinearColor>();
+		Struct->ImportText(*StringValue, &Result, nullptr, PPF_None, GLog, Struct->GetPathName());
 	}
 	else
 	{
-		UE_LOG(LogData, Warning, TEXT("Can't deserialize \"%s::%s\" as \"%s\""), *Instance->GetClass()->GetName(), *Field->Name, *PsDataTools::FType<FLinearColor>::Type());
+		UE_LOG(LogData, Warning, TEXT("Can't deserialize \"%s::%s\" as \"%s\""), *Instance->GetClass()->GetName(), *Field->Name, *PsDataTools::FType<FVector>::Type());
 	}
+
 	return Result;
 }

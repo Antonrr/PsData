@@ -10,8 +10,8 @@
 #define PS_LINE (FString::FromInt(__LINE__))         // Current Line Number in the code where this is called
 #define PS_FUNC_LINE (PS_FUNC + "(" + PS_LINE + ")") // Current Class and Line Number where this is called!
 
-#define OLD_CSV_IMPORT_FACTORY ENGINE_MINOR_VERSION < 25
-#define OLD_PROPERTY_STYLE ENGINE_MINOR_VERSION < 25
+#define OLD_CSV_IMPORT_FACTORY ENGINE_MINOR_VERSION < 25 && ENGINE_MAJOR_VERSION == 4
+#define OLD_PROPERTY_STYLE ENGINE_MINOR_VERSION < 25 && ENGINE_MAJOR_VERSION == 4
 
 #if OLD_PROPERTY_STYLE
 using FProperty = UProperty;
@@ -47,6 +47,8 @@ using FMulticastInlineDelegateProperty = UMulticastInlineDelegateProperty;
 using FMulticastSparseDelegateProperty = UMulticastSparseDelegateProperty;
 using FEnumProperty = UEnumProperty;
 using FTextProperty = UTextProperty;
+
+using FPropertyHelpers = UPropertyHelpers;
 
 template <typename FieldType>
 FieldType* CastField(UField* Src)

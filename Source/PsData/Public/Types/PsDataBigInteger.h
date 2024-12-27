@@ -291,8 +291,10 @@ public:
 	bool ImportTextItem(const TCHAR*& Buffer, int32 PortFlags, UObject* Parent, FOutputDevice* ErrorText);
 	bool Serialize(FArchive& Ar);
 	bool Serialize(FStructuredArchive::FSlot Slot);
-	friend FArchive& operator<<(FArchive& Ar, FPsDataBigInteger& Value);
-	friend void operator<<(FStructuredArchive::FSlot Slot, FPsDataBigInteger& Value);
+	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
+
+	friend PSDATA_API FArchive& operator<<(FArchive& Ar, FPsDataBigInteger& Value);
+	friend PSDATA_API void operator<<(FStructuredArchive::FSlot Slot, FPsDataBigInteger& Value);
 };
 
 namespace PsDataTools
@@ -388,3 +390,19 @@ struct TSpecificNumber<FPsDataBigInteger>
 };
 } // namespace Numbers
 } // namespace PsDataTools
+
+template <>
+struct TStructOpsTypeTraits<FPsDataBigInteger> : public TStructOpsTypeTraitsBase2<FPsDataBigInteger>
+{
+	enum
+	{
+		WithIdenticalViaEquality = true,
+		WithExportTextItem = true,
+		WithImportTextItem = true,
+		WithSerializer = true,
+		WithStructuredSerializer = true,
+		WithNetSerializer = true,
+		WithNetSharedSerialization = true,
+	};
+	static constexpr EPropertyObjectReferenceType WithSerializerObjectReferences = EPropertyObjectReferenceType::None;
+};

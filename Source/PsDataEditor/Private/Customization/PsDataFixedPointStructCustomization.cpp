@@ -22,7 +22,7 @@ void WriteFixedPointToProperty(TSharedPtr<IPropertyHandle> FixedPointPropertyHan
 		auto Data = static_cast<FPsDataFixedPoint*>(RawData);
 		*Data = Value;
 	}
-	FixedPointPropertyHandle->NotifyPostChange();
+	FixedPointPropertyHandle->NotifyPostChange(EPropertyChangeType::ValueSet);
 }
 
 TSharedRef<IPropertyTypeCustomization> FPsDataFixedPointStructCustomization::MakeInstance()
@@ -75,11 +75,13 @@ FSlateColor FPsDataFixedPointStructCustomization::HandleTextBoxForegroundColor()
 {
 	if (bInputValid)
 	{
-		static const FName InvertedForegroundName("InvertedForeground");
-		return FEditorStyle::GetSlateColor(InvertedForegroundName);
+		static const FName DefaultForeground("Colors.Foreground");
+		return FAppStyle::Get().GetSlateColor(DefaultForeground);
 	}
 
-	return FLinearColor::Red;
+	static const FName Red("Colors.AccentRed");
+
+	return FAppStyle::Get().GetSlateColor(Red);
 }
 
 FText FPsDataFixedPointStructCustomization::HandleTextBoxText() const

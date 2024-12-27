@@ -13,6 +13,7 @@ using namespace PsDataTools;
 
 const FDataStringViewChar FDataMetaType::Strict = "strict";
 const FDataStringViewChar FDataMetaType::Event = "event";
+const FDataStringViewChar FDataMetaType::EventStorage = "eventstorage";
 const FDataStringViewChar FDataMetaType::Bubbles = "bubbles";
 const FDataStringViewChar FDataMetaType::Alias = "alias";
 const FDataStringViewChar FDataMetaType::ReadOnly = "readonly";
@@ -102,6 +103,7 @@ bool FDataRawMeta::Remove(const FDataStringViewChar& Key)
 FDataFieldMeta::FDataFieldMeta()
 	: bStrict(false)
 	, bEvent(false)
+	, bEventStorage(false)
 	, bBubbles(false)
 	, bDeprecated(false)
 	, bReadOnly(false)
@@ -320,6 +322,14 @@ void ApplyMetaItems(FDataField* Field, FDataRawMeta& RawMeta)
 
 		RawMeta.Remove(FDataMetaType::Event);
 	}
+	if (const auto EventStorage = RawMeta.Find(FDataMetaType::EventStorage))
+	{
+		Field->Meta.bEventStorage = true;
+		PrintUnusedMetaValue(EventStorage);
+		PrintApplyMeta(EventStorage);
+
+		RawMeta.Remove(FDataMetaType::EventStorage);
+	}
 	if (const auto Bubbles = RawMeta.Find(FDataMetaType::Bubbles))
 	{
 		Field->Meta.bBubbles = true;
@@ -375,6 +385,16 @@ void ApplyMetaItems(FDataField* Field, FDataRawMeta& RawMeta)
 		Field->Meta.bEvent = false;
 		Field->Meta.bBubbles = false;
 		UE_LOG(LogDataReflection, Error, TEXT("Property with strict meta can't broadcast event"))
+	}
+
+	if (Field->Meta.bBubbles && !Field->Meta.bEvent)
+	{
+		Field->Meta.bBubbles = false;
+	}
+
+	if (Field->Meta.bEventStorage && !Field->Meta.bEvent)
+	{
+		Field->Meta.bEventStorage = false;
 	}
 }
 

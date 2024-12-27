@@ -1,4 +1,4 @@
-// Copyright 2021-2022 dawg.team. All Rights Reserved.
+// Copyright 2015-2024 MY.GAMES. All Rights Reserved.
 
 #pragma once
 
@@ -30,11 +30,13 @@ struct FPsNetworkByteBuffer
 	TArray<uint8> Buffer;
 
 	bool Serialize(FArchive& Ar);
-	bool Serialize(FStructuredArchive::FSlot Slot);
 	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
 	friend FArchive& operator<<(FArchive& Ar, FPsNetworkByteBuffer& Value);
-	friend void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkByteBuffer& Value);
 };
+
+/***********************************
+ * EPsNetworkEventType
+ ***********************************/
 
 UENUM(BlueprintType, Blueprintable)
 enum class EPsNetworkEventType : uint8
@@ -55,54 +57,24 @@ struct FPsNetworkEvent
 	GENERATED_BODY()
 
 	FPsNetworkEvent();
-	FPsNetworkEvent(EPsNetworkEventType InType, const FString& InPath, const TArray<uint8>& InBuffer);
+	FPsNetworkEvent(EPsNetworkEventType InType, const TArray<uint16>& InPath, const TArray<uint8>& InBuffer);
+	FPsNetworkEvent(EPsNetworkEventType InType, const TArray<uint16>& InPath);
 
 	EPsNetworkEventType Type;
-	FString Path;
+	TArray<uint16> Path;
 	FPsNetworkByteBuffer Data;
 
 	bool Serialize(FArchive& Ar);
-	bool Serialize(FStructuredArchive::FSlot Slot);
 	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
 	friend FArchive& operator<<(FArchive& Ar, FPsNetworkEvent& Value);
-	friend void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkEvent& Value);
 };
 
 /***********************************
- * FPsNetworkEventBundle
- ***********************************/
-
-USTRUCT()
-struct FPsNetworkEventBundle
-{
-	GENERATED_BODY()
-
-	FPsNetworkEventBundle();
-
-	void AddEvent(EPsNetworkEventType InType, const FString& InPath, const TArray<uint8>& InBuffer);
-
-	TArray<FPsNetworkEvent> GetBundle() const;
-
-	void Reset();
-
-	bool HasEvents() const;
-
-	bool Serialize(FArchive& Ar);
-	bool Serialize(FStructuredArchive::FSlot Slot);
-	bool NetSerialize(FArchive& Ar, UPackageMap* Map, bool& bOutSuccess);
-	friend FArchive& operator<<(FArchive& Ar, FPsNetworkEventBundle& Value);
-	friend void operator<<(FStructuredArchive::FSlot Slot, FPsNetworkEventBundle& Value);
-
-private:
-	TArray<FPsNetworkEvent> Events;
-};
-
-/***********************************
- * ADataNetworkActor
+ * APsDataNetworkActor
  ***********************************/
 
 UCLASS()
-class PSDATA_API ADataNetworkActor : public AActor
+class PSDATA_API APsDataNetworkActor : public AActor
 {
 	GENERATED_BODY()
 
@@ -116,7 +88,7 @@ class PSDATA_API ADataNetworkActor : public AActor
 	};
 
 public:
-	ADataNetworkActor();
+	APsDataNetworkActor();
 
 	bool IsAuthority() const;
 
@@ -131,21 +103,27 @@ protected:
 
 	void Close();
 
-	void Synchronize(const FPsNetworkByteBuffer& Buffer);
+	void Synchronize(const TArray<FString>& Dictionary, const FPsNetworkByteBuffer& Buffer);
 
-	void Send(const FPsNetworkEventBundle& Events);
+	void Send(const TArray<FString>& Dictionary, const TArray<FPsNetworkEvent>& Events);
 
 private:
+	TArray<FPsNetworkByteBuffer> MakeDictionaryForReplication(const TArray<FString>& Dictionary);
+
+	TArray<FString> MakeDictionaryFromReplication(const TArray<FPsNetworkByteBuffer>& Dictionary) const;
+
 	UFUNCTION(Server, Reliable)
 	void Server_Confirm();
 
 	UFUNCTION(Client, Reliable)
-	void Client_Synchronize(const FPsNetworkByteBuffer& Buffer);
+	void Client_Synchronize(const TArray<FPsNetworkByteBuffer>& Dictionary, const FPsNetworkByteBuffer& Buffer);
 
 	UFUNCTION(Client, Reliable)
-	void Client_Send(const FPsNetworkEventBundle& Events);
+	void Client_Send(const TArray<FPsNetworkByteBuffer>& Dictionary, const TArray<FPsNetworkEvent>& Events);
 
 	EProxyState State;
+
+	int32 LastDictionarySize;
 
 	UPROPERTY()
 	UPsNetworkData* NetworkData;
@@ -166,6 +144,9 @@ public:
 	/** How often (per second) this data will be considered for replication */
 	float NetUpdateFrequency;
 
+	/** Accumulate events */
+	bool bAccumulateEvents;
+
 	void OpenConnection(APlayerController* Controller) const;
 
 	void CloseConnection(APlayerController* Controller) const;
@@ -180,7 +161,7 @@ public:
 
 private:
 	friend class UPsData;
-	friend class ADataNetworkActor;
+	friend class APsDataNetworkActor;
 
 	virtual void Tick(float DeltaTime) override;
 
@@ -194,9 +175,9 @@ private:
 
 	void HandlingControllers();
 
-	void Synchronize(const FPsNetworkByteBuffer& Buffer);
+	void Synchronize(const TArray<FString>& DictionaryDiff, const FPsNetworkByteBuffer& Buffer);
 
-	void Apply(const FPsNetworkEventBundle& Events);
+	void Apply(const TArray<FString>& DictionaryDiff, const TArray<FPsNetworkEvent>& Events);
 
 	bool ApplyChanged(FAbstractDataProperty* Property, const FPsNetworkByteBuffer& Buffer) const;
 
@@ -206,7 +187,9 @@ private:
 
 	void MutableReset() const;
 
-	FPsNetworkEventBundle NetworkEvents;
+	TArray<FString> Dictionary;
+
+	TArray<FPsNetworkEvent> NetworkEvents;
 
 	float AccumulatedTime;
 
@@ -218,7 +201,33 @@ private:
 	mutable TArray<APlayerController*> PendingControllers;
 
 	UPROPERTY()
-	mutable TArray<ADataNetworkActor*> NetworkProxies;
+	mutable TArray<APsDataNetworkActor*> NetworkProxies;
 
 	mutable FPsDataSimplePromise SynchronizePromise;
+};
+
+template <>
+struct TStructOpsTypeTraits<FPsNetworkByteBuffer> : public TStructOpsTypeTraitsBase2<FPsNetworkByteBuffer>
+{
+	enum
+	{
+		WithZeroConstructor = true,
+		WithSerializer = true,
+		WithNetSerializer = true,
+		WithNetSharedSerialization = true,
+	};
+	static constexpr EPropertyObjectReferenceType WithSerializerObjectReferences = EPropertyObjectReferenceType::None;
+};
+
+template <>
+struct TStructOpsTypeTraits<FPsNetworkEvent> : public TStructOpsTypeTraitsBase2<FPsNetworkEvent>
+{
+	enum
+	{
+		WithZeroConstructor = true,
+		WithSerializer = true,
+		WithNetSerializer = true,
+		WithNetSharedSerialization = true,
+	};
+	static constexpr EPropertyObjectReferenceType WithSerializerObjectReferences = EPropertyObjectReferenceType::None;
 };

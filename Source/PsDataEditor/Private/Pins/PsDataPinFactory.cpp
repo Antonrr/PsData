@@ -90,7 +90,7 @@ TSharedPtr<class SGraphPin> FPsDataPinFactory::CreatePin(class UEdGraphPin* InPi
 		if (CallingFunction == BindFunction || CallingFunction == UnbindFunction)
 		{
 			UEdGraphPin* Pin = Node->FindPin(UEdGraphSchema_K2::PN_Self, EEdGraphPinDirection::EGPD_Input);
-			if (Pin && Pin->LinkedTo.Num() > 0)
+			if (Pin && Pin->LinkedTo.Num() == 1)
 			{
 				UEdGraphPin* OwnerPin = Pin->LinkedTo[0];
 				if (OwnerPin->PinType.PinSubCategoryObject.IsValid())
@@ -98,7 +98,34 @@ TSharedPtr<class SGraphPin> FPsDataPinFactory::CreatePin(class UEdGraphPin* InPi
 					UClass* TargetClass = Cast<UClass>(OwnerPin->PinType.PinSubCategoryObject.Get());
 					if (TargetClass)
 					{
-						return SNew(SPsDataGraphPinEventList, InPin, GenerateEvents(TargetClass));
+						const auto EventPathList = GenerateEvents(TargetClass);
+
+						bool bValidSelection = true;
+						if (!InPin->DefaultValue.IsEmpty())
+						{
+							bValidSelection = false;
+							for (const auto& EventPath : EventPathList)
+							{
+								if (InPin->DefaultValue == EventPath->Type)
+								{
+									bValidSelection = true;
+									break;
+								}
+							}
+						}
+
+						if (bValidSelection)
+						{
+							return SNew(SPsDataGraphPinEventList, InPin, EventPathList);
+						}
+
+						FString Context = "";
+						if (const auto Blueprint = Node->GetBlueprint())
+						{
+							Context += Blueprint->GetName();
+						}
+
+						UE_LOG(LogData, Warning, TEXT("[%s] Wrong event name: \"%s\" for class: \"%s\""), *Context, *InPin->DefaultValue, *TargetClass->GetName());
 					}
 				}
 			}

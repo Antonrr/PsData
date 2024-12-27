@@ -21,11 +21,14 @@ protected:
 	int32 PrevIndex;
 
 public:
+	virtual uint8 ReadUint8() override;
+	virtual int8 ReadInt8() override;
+	virtual uint16 ReadUint16() override;
+	virtual int16 ReadInt16() override;
 	virtual uint32 ReadUint32() override;
 	virtual int32 ReadInt32() override;
 	virtual uint64 ReadUint64() override;
 	virtual int64 ReadInt64() override;
-	virtual uint8 ReadUint8() override;
 	virtual float ReadFloat() override;
 	virtual bool ReadBool() override;
 	virtual TCHAR ReadTCHAR() override;

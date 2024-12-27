@@ -75,13 +75,6 @@ private:
 namespace PsDataTools
 {
 template <typename T>
-UEnum* FindUEnum()
-{
-	static auto Enum = FindObject<UEnum>(ANY_PACKAGE, *FType<T>::ContentType());
-	return Enum;
-}
-
-template <typename T>
 struct FEnumDataTypeContext : public TDataTypeContextExtended<T, UPsDataEnumLibrary>
 {
 	static_assert(std::is_enum<T>::value && sizeof(T) == 1, "Only \"enum class : uint8\" can be described by DESCRIBE_ENUM macros");
@@ -189,25 +182,34 @@ struct FEnumDataTypeContext<TMap<FString, T>> : public TDataTypeContextExtended<
 	template <>                                                                                                                                \
 	struct TDataTypeContext<__Type__> : public FEnumDataTypeContext<__Type__>                                                                  \
 	{                                                                                                                                          \
-		virtual ~TDataTypeContext() {}                                                                                                         \
+		virtual ~TDataTypeContext()                                                                                                            \
+		{                                                                                                                                      \
+		}                                                                                                                                      \
 	};                                                                                                                                         \
                                                                                                                                                \
 	template <>                                                                                                                                \
 	struct TDataTypeContext<TArray<__Type__>> : public FEnumDataTypeContext<TArray<__Type__>>                                                  \
 	{                                                                                                                                          \
-		virtual ~TDataTypeContext() {}                                                                                                         \
+		virtual ~TDataTypeContext()                                                                                                            \
+		{                                                                                                                                      \
+		}                                                                                                                                      \
 	};                                                                                                                                         \
                                                                                                                                                \
 	template <>                                                                                                                                \
 	struct TDataTypeContext<TMap<FString, __Type__>> : public FEnumDataTypeContext<TMap<FString, __Type__>>                                    \
 	{                                                                                                                                          \
-		virtual ~TDataTypeContext() {}                                                                                                         \
+		virtual ~TDataTypeContext()                                                                                                            \
+		{                                                                                                                                      \
+		}                                                                                                                                      \
 	};                                                                                                                                         \
                                                                                                                                                \
 	template <>                                                                                                                                \
 	struct TTypeDefault<__Type__>                                                                                                              \
 	{                                                                                                                                          \
-		static const __Type__ GetDefaultValue() { return static_cast<__Type__>(0); }                                                           \
+		static const __Type__ GetDefaultValue()                                                                                                \
+		{                                                                                                                                      \
+			return static_cast<__Type__>(0);                                                                                                   \
+		}                                                                                                                                      \
 	};                                                                                                                                         \
                                                                                                                                                \
 	template <>                                                                                                                                \

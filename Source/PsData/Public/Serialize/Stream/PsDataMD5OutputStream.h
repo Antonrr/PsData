@@ -5,8 +5,8 @@
 #include "Serialize/Stream/PsDataBufferOutputStream.h"
 #include "Serialize/Stream/PsDataOutputStream.h"
 
-#include "Core/Public/Misc/SecureHash.h"
 #include "CoreMinimal.h"
+#include "Misc/SecureHash.h"
 
 /***********************************
  * FPsDataMD5Hash
@@ -17,8 +17,8 @@ struct PSDATA_API FPsDataMD5Hash
 	FPsDataMD5Hash(FMD5 Md5Gen);
 
 	FString ToString() const;
-	uint32 ToUint32() const;
-	uint64 ToUint64() const;
+	int32 ToInt32() const;
+	int64 ToInt64() const;
 	void GetDigest(uint64& OutA, uint64& OutB) const;
 
 private:
@@ -43,11 +43,14 @@ private:
 public:
 	FPsDataMD5Hash GetHash();
 
+	virtual void WriteUint8(uint8 Value) override;
+	virtual void WriteInt8(int8 Value) override;
+	virtual void WriteUint16(uint16 Value) override;
+	virtual void WriteInt16(int16 Value) override;
 	virtual void WriteUint32(uint32 Value) override;
 	virtual void WriteInt32(int32 Value) override;
 	virtual void WriteUint64(uint64 Value) override;
 	virtual void WriteInt64(int64 Value) override;
-	virtual void WriteUint8(uint8 Value) override;
 	virtual void WriteFloat(float Value) override;
 	virtual void WriteBool(bool Value) override;
 	virtual void WriteTCHAR(TCHAR Value) override;

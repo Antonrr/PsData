@@ -38,9 +38,9 @@ void FPsDataFriend::RemoveChild(UPsData* Parent, UPsData* Data)
 	Parent->RemoveChild(Data);
 }
 
-void FPsDataFriend::Changed(UPsData* Data, const FDataField* Field)
+void FPsDataFriend::Changed(UPsData* Data, const FDataField* Field, TSharedPtr<FAbstractDataPropertyEventStorage> EventStorage)
 {
-	Data->Changed(Field);
+	Data->Changed(Field, EventStorage);
 }
 
 void FPsDataFriend::InitProperties(UPsData* Data)
@@ -320,7 +320,7 @@ void UPsData::ChangeName(const FString& Name, const FString& CollectionName)
 	}
 }
 
-void UPsData::Changed(const FDataField* Field)
+void UPsData::Changed(const FDataField* Field, TSharedPtr<FAbstractDataPropertyEventStorage> EventStorage)
 {
 	DropImprint();
 
@@ -329,12 +329,12 @@ void UPsData::Changed(const FDataField* Field)
 	{
 		if (IsBound(EventName, Field->Meta.bBubbles))
 		{
-			Broadcast(UPsDataEvent::ConstructEvent(EventName, Field->Meta.bBubbles));
+			Broadcast(UPsDataEvent::ConstructEventWithStorage(EventName, Field->Meta.bBubbles, EventStorage));
 		}
 	}
 	else if (IsBoundWithFlag(EventName, EDataBindFlags::IgnoreFieldMeta, false))
 	{
-		Broadcast(UPsDataEvent::ConstructEvent(EventName, false));
+		Broadcast(UPsDataEvent::ConstructEventWithStorage(EventName, false, EventStorage));
 	}
 
 	if (!bChanged)
@@ -893,6 +893,17 @@ const FString& UPsData::GetCollectionKey() const
 	return CollectionKey;
 }
 
+const FDataField* UPsData::GetParentField() const
+{
+	PsDataTools::TDataPathExecutor<true, true> PathExecutor(const_cast<UPsData*>(this));
+	if (PathExecutor.Normalize())
+	{
+		return PathExecutor.GetField();
+	}
+
+	return nullptr;
+}
+
 void UPsData::GetPathFromData(const UPsData* Data, FString& OutPath) const
 {
 	if (this == Data)
@@ -945,6 +956,12 @@ FString UPsData::GetHash() const
 {
 	CalculateHash();
 	return Hash.GetValue().ToString();
+}
+
+int32 UPsData::GetHashInt32() const
+{
+	CalculateHash();
+	return Hash.GetValue().ToInt32();
 }
 
 bool UPsData::InCollection() const

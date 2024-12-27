@@ -109,11 +109,6 @@ FString SerializeClass(const UClass* Class)
 	return Class->GetName();
 }
 
-UClass* DeserializeClass(const FString& ClassName)
-{
-	return FindObject<UClass>(ANY_PACKAGE, *ClassName);
-}
-
 static const FString CustomTypeParam(TEXT("CustomType"));
 
 void UPsDataUPsDataLibrary::TypeSerialize(const UPsData* const Instance, const FDataField* Field, FPsDataSerializer* Serializer, const void* Value)
@@ -158,7 +153,7 @@ void* UPsDataUPsDataLibrary::TypeDeserialize(UPsData* Instance, const FDataField
 							const bool bTypeContains = Deserializer->ReadValue(TypeValue);
 							Deserializer->PopIndex();
 
-							auto Class = DeserializeClass(TypeValue);
+							auto Class = PsDataTools::FindUClass(*TypeValue);
 							if (!Class)
 							{
 								Class = CastChecked<UClass>(Field->Context->GetUEType());
